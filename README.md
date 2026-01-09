@@ -161,8 +161,8 @@ Project/
 ## 👨‍💻 Identitas Pengembang
 * **Nama:** Althaf Sulistyo Wicaksono
 * **NIM:** 0110122227
-* **Program Studi:** Informatika
-* **Kampus:** Institut Teknologi Kalimantan
+* **Program Studi:** Sistem Informasi 
+* **Kampus:** Sekolah Tinggi Teknologi Terpadu Nurul Fikri
 * **Email:** alth22227si@student.nurulfikri.ac.id
 * **Tahun:** 2026
 ## 📝 Lisensi
