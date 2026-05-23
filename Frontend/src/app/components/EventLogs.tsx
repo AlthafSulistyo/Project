@@ -106,7 +106,7 @@ export function EventLogs() {
                 placeholder="Search location or ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
             </div>
           </div>
@@ -114,7 +114,7 @@ export function EventLogs() {
           <select
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
-            className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+            className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
           >
             <option value="all">All Event Types</option>
             <option value="intrusion">Intrusion</option>
@@ -126,10 +126,10 @@ export function EventLogs() {
           <input
             type="text"
             placeholder="Oct 1 - Oct 24, 2025"
-            className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+            className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-600"
           />
 
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
             <Download className="size-4" />
             Export PDF
           </button>
@@ -174,7 +174,7 @@ export function EventLogs() {
                     {event.status}
                   </td>
                   <td className="py-3 px-4">
-                    <button className="text-blue-400 hover:text-blue-300 transition-colors">
+                    <button className="text-emerald-400 hover:text-emerald-300 transition-colors">
                       <Eye className="size-4" />
                     </button>
                   </td>
@@ -192,7 +192,7 @@ export function EventLogs() {
             <button className="px-3 py-1 bg-gray-800 text-gray-400 rounded hover:bg-gray-700 transition-colors">
               Previous
             </button>
-            <button className="px-3 py-1 bg-blue-600 text-white rounded">1</button>
+            <button className="px-3 py-1 bg-emerald-600 text-white rounded">1</button>
             <button className="px-3 py-1 bg-gray-800 text-gray-400 rounded hover:bg-gray-700 transition-colors">2</button>
             <button className="px-3 py-1 bg-gray-800 text-gray-400 rounded hover:bg-gray-700 transition-colors">3</button>
             <button className="px-3 py-1 bg-gray-800 text-gray-400 rounded hover:bg-gray-700 transition-colors">

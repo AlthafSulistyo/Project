@@ -48,7 +48,7 @@ export function RecentAlerts() {
     <div className="bg-[#0f1420] border border-gray-800 rounded-lg p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-white">Recent Alerts</h3>
-        <button className="text-blue-400 text-sm hover:text-blue-300">View All</button>
+        <button className="text-emerald-400 text-sm hover:text-emerald-300">View All</button>
       </div>
 
       <div className="space-y-3">
@@ -69,7 +69,7 @@ export function RecentAlerts() {
             <div className="text-white text-sm mb-1">{alert.type}</div>
             <div className="text-gray-400 text-xs mb-3">{alert.location}</div>
 
-            <button className="flex items-center gap-2 text-blue-400 text-xs hover:text-blue-300">
+            <button className="flex items-center gap-2 text-emerald-400 text-xs hover:text-emerald-300">
               <Eye className="size-3" />
               View Clip
             </button>

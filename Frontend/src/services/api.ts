@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 // Ganti URL ini sesuai alamat server Laravel Anda nanti
-// Backend API berjalan di port 5174
-const API_BASE_URL = 'http://localhost:5174/api';
+// Backend API berjalan di port 8000
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

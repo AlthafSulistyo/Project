@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Software Requirements Specification (SRS) - SchoolGuard</title>
+    <style>
+        body { font-family: 'Times New Roman', Times, serif; line-height: 1.6; margin: 40px; color: #000; }
+        h1 { color: #1a202c; text-align: center; border-bottom: 3px solid #2f855a; padding-bottom: 10px; font-size: 28px; }
+        h2 { color: #276749; margin-top: 40px; border-bottom: 2px solid #cbd5e0; padding-bottom: 5px; font-size: 22px; }
+        h3 { color: #2f855a; margin-top: 25px; font-size: 18px; }
+        h4 { color: #2d3748; margin-top: 20px; font-size: 16px; font-style: italic; }
+        p { text-align: justify; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; font-size: 14px; }
+        th, td { border: 1px solid #718096; padding: 12px; text-align: left; vertical-align: top; }
+        th { background-color: #f0fff4; color: #276749; font-weight: bold; }
+        ul, ol { margin-bottom: 20px; padding-left: 30px; }
+        li { margin-bottom: 8px; text-align: justify; }
+        strong { color: #1a202c; }
+        .toc { background-color: #f7fafc; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 40px; }
+        .toc h3 { margin-top: 0; text-align: center; }
+        .toc ul { list-style-type: none; padding-left: 15px; }
+    </style>
+</head>
+<body>
+
+    <h1>SOFTWARE REQUIREMENTS SPECIFICATION (SRS)<br>Sistem Keamanan "SchoolGuard" SMAS Plus Cendekia Cikeas</h1>
+
+    <div class="toc">
+        <h3>Daftar Isi</h3>
+        <ul>
+            <li><strong>1. Pendahuluan (Introduction)</strong>
+                <ul>
+                    <li>1.1 Tujuan (Purpose)</li>
+                    <li>1.2 Ruang Lingkup (Scope)</li>
+                    <li>1.3 Definisi, Akronim, dan Singkatan</li>
+                    <li>1.4 Referensi</li>
+                </ul>
+            </li>
+            <li><strong>2. Deskripsi Umum (Overall Description)</strong>
+                <ul>
+                    <li>2.1 Perspektif Produk</li>
+                    <li>2.2 Fungsi Produk Utama</li>
+                    <li>2.3 Karakteristik Pengguna</li>
+                    <li>2.4 Lingkungan Operasional</li>
+                    <li>2.5 Batasan Sistem (Constraints)</li>
+                    <li>2.6 Asumsi dan Ketergantungan</li>
+                </ul>
+            </li>
+            <li><strong>3. Persyaratan Sistem Terperinci (System Requirements)</strong>
+                <ul>
+                    <li>3.1 Kebutuhan Fungsional per Modul</li>
+                    <li>3.2 Kebutuhan Non-Fungsional</li>
+                    <li>3.3 Kebutuhan Antarmuka (Interface Requirements)</li>
+                </ul>
+            </li>
+            <li><strong>4. Skenario Penggunaan (Use Case Requirements)</strong>
+                <ul>
+                    <li>4.1 Deskripsi Use Case Detail</li>
+                </ul>
+            </li>
+            <li><strong>5. Persyaratan Tambahan (Additional Requirements)</strong>
+                <ul>
+                    <li>5.1 Mekanisme Audit Trail</li>
+                    <li>5.2 Pencadangan (Backup) dan Pemulihan</li>
+                    <li>5.3 Arsitektur Implementasi Jaringan</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <h2>1. Pendahuluan (Introduction)</h2>
+
+    <h3>1.1 Tujuan (Purpose)</h3>
+    <p>Tujuan utama penyusunan dokumen <em>Software Requirements Specification</em> (SRS) ini adalah untuk mendefinisikan persyaratan teknis, fungsional, dan non-fungsional secara komprehensif bagi pengembangan sistem <strong>SchoolGuard</strong> (Aplikasi Dashboard Pemantauan Data CCTV Berbasis Web pada SMAS Plus Cendekia Cikeas). Dokumen ini ditujukan bagi tim pengembang (Developer), tim Infrastruktur/IT Sekolah, dan Manajemen Sekolah (Kepala Sekolah/Kesiswaan) sebagai acuan pasti (<em>baseline</em>) dalam seluruh fase siklus hidup pengembangan perangkat lunak.</p>
+    <p>Sistem ini dirancang secara khusus untuk mentransformasi infrastruktur keamanan sekolah dari pemantauan pasif berbasis rekaman DVR analog menuju pemantauan cerdas (<em>Smart Monitoring</em>) yang aktif, otomatis, dan terintegrasi melalui perangkat <em>Internet of Things</em> (IoT). Fokus sistem adalah meringankan beban staf dalam merekapitulasi pelanggaran atau aktivitas mencurigakan dengan mengandalkan analitik bawaan perangkat kamera (<em>Edge Analytics</em>) untuk menghasilkan informasi kuantitatif.</p>
+
+    <h3>1.2 Ruang Lingkup (Scope)</h3>
+    <p>Nama produk perangkat lunak ini adalah <strong>SchoolGuard</strong>. Sistem ini dikembangkan menggunakan arsitektur modern terpisah (<em>decoupled architecture</em>), di mana <strong>Laravel 11</strong> digunakan untuk menangani proses Backend (API, Database, Webhook, Autentikasi) dan <strong>React.js (dengan Vite dan Tailwind CSS)</strong> digunakan sebagai antarmuka pengguna interaktif (Frontend Single Page Application). Untuk layanan siaran langsung, sistem menggunakan <strong>MediaMTX</strong> sebagai jembatan transmisi video RTSP menjadi WebRTC berlatensi rendah.</p>
+    <p>Ruang lingkup sistem mencakup:</p>
+    <ul>
+        <li><strong>Agregator Data Analitik:</strong> Sistem menerima dan mengumpulkan data hasil deteksi klasifikasi target (Manusia & Kendaraan) dari unit kamera pintar (Hikvision AcuSense) secara otomatis (melalui <em>ISAPI Polling</em> maupun <em>Webhook Push</em>).</li>
+        <li><strong>Live CCTV Monitoring:</strong> Menyediakan halaman <em>Video Wall</em> yang menampilkan siaran langsung dari berbagai titik kamera secara serentak langsung di peramban web pengguna tanpa perangkat lunak tambahan.</li>
+        <li><strong>Early Warning System (Sistem Peringatan Dini):</strong> Memberikan notifikasi instan berbasis level urgensi (Tingkat Bahaya) ketika anomali terdeteksi di area pemantauan.</li>
+        <li><strong>Visualisasi & Pelaporan:</strong> Meringkas ribuan baris <em>log</em> data menjadi grafik statistik yang representatif dan menyediakan fungsi cetak laporan otomatis dalam format PDF dan Microsoft Excel.</li>
+    </ul>
+
+    <h3>1.3 Definisi, Akronim, dan Singkatan</h3>
+    <ul>
+        <li><strong>SRS</strong>: <em>Software Requirement Specification</em>, dokumen spesifikasi teknis perangkat lunak.</li>
+        <li><strong>Smart CCTV / Intelligent Edge Device</strong>: Kamera pengawas generasi modern yang memiliki cip komputasi bawaan untuk menjalankan algoritma <em>Deep Learning</em> (mengklasifikasi objek manusia/kendaraan) tanpa perlu diproses di server.</li>
+        <li><strong>VCA (Video Content Analysis)</strong>: Modul bawaan dari kamera pintar yang mendeteksi intrusi, pergerakan, dan batas area.</li>
+        <li><strong>ISAPI (Intelligent Security Application Programming Interface)</strong>: Protokol API berbasis HTTP/RESTful eksklusif milik Hikvision untuk mengambil data dan konfigurasi perangkat.</li>
+        <li><strong>Webhook</strong>: Metode pengiriman data secara satu arah (<em>push</em>) dari sistem asal (kamera CCTV) ke sistem penerima (Server Laravel) secara <em>real-time</em> saat sebuah kejadian (<em>event</em>) terjadi.</li>
+        <li><strong>MediaMTX</strong>: Server <em>streaming</em> <em>open-source</em> berkinerja tinggi yang digunakan untuk menerima aliran video RTSP (Real Time Streaming Protocol) dari kamera dan menyebarkannya kembali menggunakan protokol ramah web (seperti WebRTC).</li>
+        <li><strong>WebRTC</strong>: <em>Web Real-Time Communication</em>, standar protokol web yang memungkinkan transmisi video dengan latensi sangat rendah (mendekati 0 detik).</li>
+        <li><strong>SPA (Single Page Application)</strong>: Aplikasi web yang dimuat satu kali dan memuat konten secara dinamis (tanpa <em>refresh</em> halaman penuh) menggunakan React.js.</li>
+        <li><strong>RBAC (Role-Based Access Control)</strong>: Sistem pengaturan hak akses pengguna berdasarkan peran spesifik (Admin, Manajemen, Staf).</li>
+    </ul>
+
+    <h3>1.4 Referensi</h3>
+    <ol>
+        <li>Skripsi Tugas Akhir: <em>0110122227_Althaf Sulistyo Wicaksono_ PENGEMBANGAN APLIKASI DASHBOARD PEMANTAUAN DATA CCTV BERBASIS WEB PADA SMAS PLUS CENDEKIA CIKEAS</em>.</li>
+        <li>Dokumentasi Resmi Framework: Laravel 11.x, React.js 18.x, Tailwind CSS 3.x.</li>
+        <li>Dokumentasi MediaMTX (RTSP/WebRTC Gateway).</li>
+        <li>Hasil wawancara dan observasi langsung dengan Bagian Kesiswaan & Manajemen SMAS Plus Cendekia Cikeas.</li>
+    </ol>
+
+    <hr>
+
+    <h2>2. Deskripsi Umum (Overall Description)</h2>
+
+    <h3>2.1 Perspektif Produk</h3>
+    <p>SchoolGuard memposisikan diri sebagai solusi <em>Middleware</em> analitik dan visualisasi keamanan. Aplikasi ini berdiri di antara dua komponen fisik: Perangkat Keras (kamera CCTV di lapangan) dan Pengguna Manusia (staf sekolah di ruang administrasi/pemantauan).</p>
+    <p>Tidak seperti perangkat NVR (<em>Network Video Recorder</em>) konvensional yang fungsi utamanya merekam video mentah ke dalam piringan hitam (Harddisk), <strong>SchoolGuard difokuskan pada manajemen metadata (data dalam wujud teks) dan visualisasi langsung (WebRTC streaming).</strong> Server SchoolGuard tidak menyimpan <em>file</em> rekaman video (MP4/AVI) dari CCTV demi efisiensi penyimpanan, melainkan hanya menyimpan <em>log</em> JSON hasil analisis kecerdasan buatan dari kamera tersebut.</p>
+
+    <h3>2.2 Fungsi Produk Utama</h3>
+    <ul>
+        <li><strong>Real-time Surveillance (Pemantauan Langsung):</strong> Menampilkan antarmuka <em>Live View</em> berbentuk <em>grid</em> (kotak-kotak) berisi tayangan video tanpa jeda melalui jembatan MediaMTX, dilengkapi indikator waktu (<em>timestamp</em>) dan nama kamera. Fitur perbesaran (<em>Fullscreen</em>) didukung.</li>
+        <li><strong>Event Capture & Synchronization (Perekaman Kejadian):</strong> Menyediakan modul titik akhir (<em>endpoint</em>) yang siaga 24/7 menerima <em>payload</em> JSON dari kamera (Webhook) ketika kamera mendeteksi aktivitas spesifik (seperti objek manusia).</li>
+        <li><strong>Severity Mapping (Pemetaan Tingkat Bahaya):</strong> Mendukung konfigurasi ambang batas parameter. Sistem secara cerdas akan memberikan label tingkat keparahan (Rendah = Biru, Sedang = Kuning, Tinggi = Oranye, Bahaya = Merah) pada setiap kejadian yang masuk.</li>
+        <li><strong>Interactive Analytics Dashboard:</strong> Halaman ringkasan dengan komponen <em>Area Chart</em> dan diagram statistik (seperti <em>Recharts</em>) yang meringkas total kejadian per hari, jam paling padat, dan lokasi dengan insiden terbanyak. Dilengkapi dengan antarmuka <em>Dark Mode</em> (Skema Hijau Zamrud/Emerald) untuk kenyamanan pandangan visual di ruangan minim cahaya.</li>
+        <li><strong>Automated Reporting System:</strong> Modul pembuatan laporan manajemen yang dapat memilah data berdasarkan tanggal dan kamera, lalu mengekspor (<em>Export</em>) data tersebut ke format portabel (PDF) atau dapat disunting (Microsoft Excel).</li>
+    </ul>
+
+    <h3>2.3 Karakteristik Pengguna</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Peran / Aktor</th>
+                <th>Tugas & Akses di Sistem</th>
+                <th>Kebutuhan Antarmuka & Kemahiran</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Administrator (Tim IT)</strong></td>
+                <td>Mengontrol seluruh aspek konfigurasi teknis. Mengatur integrasi ISAPI, URL Webhook, mengelola akun (User Management), menambah/menghapus titik Kamera (RTSP URL), dan mengakses <em>Audit Logs</em>.</td>
+                <td>Kemahiran teknis tingkat lanjut (mengerti jaringan TCP/IP, server, dan API). Mengakses sistem melalui PC Desktop/Laptop.</td>
+            </tr>
+            <tr>
+                <td><strong>Manajemen (Kepala Sekolah / Wakil Kesiswaan)</strong></td>
+                <td>Mengambil keputusan berdasarkan data. Memiliki akses penuh terhadap Dashboard Analitik dan fitur Pembuatan Laporan (Download Laporan Mingguan/Bulanan).</td>
+                <td>Kemahiran operasional dasar-menengah. Antarmuka harus sederhana, menampilkan grafik besar, mudah difilter. Sering mengakses lewat Tablet atau Laptop.</td>
+            </tr>
+            <tr>
+                <td><strong>Staf Operasional (Guru Piket / Satpam)</strong></td>
+                <td>Aktor yang berhadapan langsung di lapangan. Memerlukan akses ke halaman <em>Live Monitoring</em> dan Pusat Notifikasi (<em>Early Warning</em>). Mereka bertugas merespons saat sistem berstatus "Bahaya".</td>
+                <td>Familiaritas umum terhadap komputer. Antarmuka harus mencolok saat ada peringatan. Layar dibiarkan menyala terus (<em>Always-On</em>).</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>2.4 Lingkungan Operasional</h3>
+    <p>Aplikasi didesain untuk beroperasi pada infrastruktur klien-server jaringan lokal (LAN) di lingkungan SMAS Plus Cendekia Cikeas, dengan parameter lingkungan sebagai berikut:</p>
+    <ul>
+        <li><strong>Sistem Operasi Server:</strong> Microsoft Windows (maupun Linux/Ubuntu Server) yang mendukung PHP 8.2+ dan Node.js.</li>
+        <li><strong>Web Server & Database:</strong> Apache/Nginx terintegrasi (atau PHP Artisan Serve untuk dev), dengan MySQL / MariaDB sebagai penyimpanan data relasional.</li>
+        <li><strong>Pustaka Backend:</strong> Laravel Framework versi 11.x.</li>
+        <li><strong>Layanan Streaming:</strong> Proses biner latar belakang menggunakan <code>mediamtx.exe</code> (v1.x.x) yang melayani RTSP pada port 8554 dan WebRTC pada port 8889.</li>
+        <li><strong>Lingkungan Klien (Frontend):</strong> Diperlukan peramban web modern yang mendukung HTML5 Video dan WebRTC (Google Chrome v90+, Firefox, Microsoft Edge terbaru). Dilarang menggunakan Internet Explorer.</li>
+    </ul>
+
+    <h3>2.5 Batasan Sistem (Constraints)</h3>
+    <ol>
+        <li><strong>Absennya Penyimpanan Video Lokal (No Playback DVR):</strong> Karena spesifikasi unit kamera yang digunakan tidak dibekali slot memori SD Card (<em>Edge Storage</em>) dan sistem SchoolGuard tidak bertindak sebagai NVR, maka <strong>sistem tidak dapat menelusuri mundur (<em>rewind/playback</em>) rekaman video kejadian di masa lalu</strong>. Fitur video dibatasi murni hanya untuk <em>Live View Real-Time</em>.</li>
+        <li><strong>Analitik Bergantung pada Hardware:</strong> Tingkat presisi deteksi manusia (<em>Human Detection</em>) sepenuhnya dikendalikan oleh <em>chip</em> kamera Hikvision AcuSense. Jika terjadi alarm palsu (seperti anjing/kucing terdeteksi sebagai manusia), sistem SchoolGuard hanya menerima input tersebut. SchoolGuard tidak dapat dilatih ulang (<em>re-trained</em>) untuk membedakan objek.</li>
+        <li><strong>Tanpa Pemrosesan Sinyal Suara:</strong> Aplikasi tidak mengambil, menyimpan, maupun memutar aliran audio dari kamera.</li>
+    </ol>
+
+    <h3>2.6 Asumsi dan Ketergantungan</h3>
+    <ul>
+        <li>Diasumsikan IP Address seluruh kamera di lingkungan sekolah bersifat statis (Static IP) agar server selalu dapat mengakses kamera untuk tarikan data ISAPI/RTSP.</li>
+        <li>Server yang menjalankan sistem diasumsikan telah mengatur <code>DB_HOST=localhost</code> (pada lingkungan Windows) untuk menghindari jeda waktu tunda (<em>lookup delay</em>) resolusi DNS IPv6.</li>
+        <li>Fitur Webhook berasumsi bahwa perangkat CCTV memiliki kapabilitas "HTTP Listening / Alarm Output Server" yang dapat dikonfigurasi untuk mengarah ke IP Server Laravel.</li>
+    </ul>
+
+    <hr>
+
+    <h2>3. Persyaratan Sistem Terperinci (System Requirements)</h2>
+
+    <h3>3.1 Kebutuhan Fungsional per Modul</h3>
+    <p>Daftar persyaratan fungsional (FR) dijabarkan berdasarkan klasifikasi modul fungsional sistem:</p>
+
+    <h4>A. Modul Manajemen Autentikasi dan Pengguna (Auth & User Module)</h4>
+    <table>
+        <tr><th>ID</th><th>Kebutuhan Fungsional</th></tr>
+        <tr><td>FR-AUTH-01</td><td>Sistem harus menyediakan halaman otentikasi (Login) dengan verifikasi ID User dan Kata Sandi menggunakan tokenisasi <code>Laravel Sanctum</code>.</td></tr>
+        <tr><td>FR-AUTH-02</td><td>Sistem harus melindungi (<em>protect</em>) semua rute <em>Dashboard</em> dan <em>API Backend</em> dengan pembatas akses (<em>Middleware Auth</em>).</td></tr>
+        <tr><td>FR-AUTH-03</td><td>Sistem harus memisahkan hak istimewa (<em>Privileges</em>) menjadi 3 peran: Admin (Akses Penuh), Management (Akses Laporan & Analitik), dan Staff (Akses Live Monitoring & Notifikasi).</td></tr>
+        <tr><td>FR-AUTH-04</td><td>Admin harus dapat melakukan Create, Read, Update, Delete (CRUD) terhadap data akun pengguna melalui halaman <em>User Management</em>.</td></tr>
+    </table>
+
+    <h4>B. Modul Manajemen Titik Kamera (Camera Configuration Module)</h4>
+    <table>
+        <tr><th>ID</th><th>Kebutuhan Fungsional</th></tr>
+        <tr><td>FR-CAM-01</td><td>Sistem harus memungkinkan Admin menambahkan kamera baru dengan mencatat Nama Lokasi, IP Kamera, Username/Password Kamera, Alamat URL RTSP, dan *Path* konfigurasi MediaMTX (contoh: <code>cam_1</code>).</td></tr>
+        <tr><td>FR-CAM-02</td><td>Sistem harus dapat mengubah (Update) atau menonaktifkan (Delete/Disable) kamera dari basis data jika perangkat rusak atau diganti.</td></tr>
+    </table>
+
+    <h4>C. Modul Pemantauan Langsung (Live Monitoring Module)</h4>
+    <table>
+        <tr><th>ID</th><th>Kebutuhan Fungsional</th></tr>
+        <tr><td>FR-LIVE-01</td><td>Sistem harus menampilkan halaman <em>CCTV Wall</em> berupa grid responsif (menyesuaikan kolom otomatis berdasarkan ukuran layar) yang merender siaran langsung (Live) kamera yang berstatus aktif.</td></tr>
+        <tr><td>FR-LIVE-02</td><td>Siaran video harus dimuat menggunakan komponen <code>&lt;iframe&gt;</code> yang tersambung pada <em>endpoint</em> <code>http://localhost:8889/[mtxPath]/</code> untuk menikmati latensi rendah dari WebRTC.</td></tr>
+        <tr><td>FR-LIVE-03</td><td>Sistem harus menyediakan interaksi "Klik untuk Perbesar" (<em>Fullscreen Modal</em>), memunculkan jendela melayang (Pop-up) untuk satu kamera spesifik secara penuh.</td></tr>
+        <tr><td>FR-LIVE-04</td><td>Sistem harus dengan tegas memberi informasi pemberitahuan (<em>Alert Warning</em>) pada antarmuka *Timeline* di jendela *Fullscreen* bahwa "Fitur Rewind/Playback tidak tersedia".</td></tr>
+    </table>
+
+    <h4>D. Modul Sinkronisasi Event & Tingkat Bahaya (Event Sync & Severity Module)</h4>
+    <table>
+        <tr><th>ID</th><th>Kebutuhan Fungsional</th></tr>
+        <tr><td>FR-SYNC-01</td><td>Backend harus menyediakan titik <code>/api/webhooks/cctv-ai</code> menggunakan metode POST untuk menerima sinyal otomatis dari kamera secara asinkron.</td></tr>
+        <tr><td>FR-SYNC-02</td><td>Sistem harus menyimpan metadata deteksi: Tipe Objek (<em>Human/Vehicle</em>), Tingkat Kepercayaan Kamera (<em>Confidence</em>), Waktu Kejadian (<em>Timestamp</em>), dan ID Kamera (<em>Camera_ID</em>).</td></tr>
+        <tr><td>FR-SYNC-03</td><td>Sistem harus mengevaluasi waktu kejadian (<em>Timestamp</em>) yang masuk berdasarkan aturan Tingkat Bahaya yang telah dikonfigurasi (misal: "Kejadian jam 22.00 - 05.00 adalah BAHAYA").</td></tr>
+        <tr><td>FR-SYNC-04</td><td>Sistem harus mencatat nilai Tingkat Bahaya (Rendah, Sedang, Tinggi, Bahaya) tersebut bersamaan dengan data <em>event</em> (kejadian).</td></tr>
+    </table>
+
+    <h4>E. Modul Analitik Dashboard & Early Warning (Dashboard Module)</h4>
+    <table>
+        <tr><th>ID</th><th>Kebutuhan Fungsional</th></tr>
+        <tr><td>FR-DASH-01</td><td>Halaman <em>Dashboard</em> utama harus memvisualisasikan Grafik Area (<em>Area Chart</em>) yang menampakkan fluktuasi jumlah aktivitas per jam untuk hari itu.</td></tr>
+        <tr><td>FR-DASH-02</td><td>Sistem harus menyajikan indikator "Tingkat Aktivitas Kelas" (Rasio Kepadatan dalam persen, misal 45%) yang dikalkulasi secara proporsional.</td></tr>
+        <tr><td>FR-DASH-03</td><td>Jika terdapat data kejadian berstatus "BAHAYA" atau "TINGGI", sistem harus menampilkan spanduk merah (<em>Red Banner Alert</em>) atau <em>Toast Notification</em> sebagai peringatan dini (*Early Warning*).</td></tr>
+    </table>
+
+    <h4>F. Modul Laporan dan Ekspor (Reporting Module)</h4>
+    <table>
+        <tr><th>ID</th><th>Kebutuhan Fungsional</th></tr>
+        <tr><td>FR-REP-01</td><td>Sistem harus menampilkan Tabel Rekapitulasi Data (Laporan). Tabel ini harus mendukung penyegaran data berkala secara otomatis (<em>Silent Auto-Refresh</em>).</td></tr>
+        <tr><td>FR-REP-02</td><td>Sistem harus memampukan fitur pencarian dan penyaringan data berdasarkan rentang Tanggal Awal - Tanggal Akhir, Tingkat Bahaya, serta ID Kamera.</td></tr>
+        <tr><td>FR-REP-03</td><td>Sistem harus memfasilitasi konversi data tabel tersebut menjadi dokumen statis berupa PDF dan Lembar Kerja Spreadsheet (Microsoft Excel/.xlsx) untuk diunduh (<em>Download</em>).</td></tr>
+    </table>
+
+    <h3>3.2 Kebutuhan Non-Fungsional</h3>
+    <ul>
+        <li><strong>Keamanan (Security):</strong> Seluruh komunikasi kata sandi basis data di dalam `.env` harus terlindungi. Sandi pengguna dikunci menggunakan algoritma *Bcrypt* dengan minimal *cost* (putaran) sebesar 10 hingga 12 ronde. Backend API wajib melakukan verifikasi perlindungan CORS (*Cross-Origin Resource Sharing*) agar hanya *origin* Frontend React (*localhost:5173*) yang dilayani.</li>
+        <li><strong>Kinerja (Performance):</strong> 
+            <ul>
+                <li>Permintaan *Query Database* statistik untuk memuat Dashboard utama harus dieksekusi di bawah 2 detik.</li>
+                <li>*Bandwidth streaming* WebRTC dari MediaMTX diharapkan tidak mengalami latensi lebih dari 1.5 detik agar status pemantauan murni "*Real-time*".</li>
+            </ul>
+        </li>
+        <li><strong>Usabilitas (Usability) dan Tema Desain:</strong> Seluruh aplikasi Frontend menggunakan paradigma perancangan UI bertema "Gelap" (<em>Dark Mode</em>) dengan rona aksen warna "Zamrud" (<em>Emerald / Green</em>). Pewarnaan tingkat bahaya harus menggunakan kaidah universal (Merah=Bahaya, Kuning/Oranye=Tinggi/Sedang, Biru/Hijau=Rendah/Aman) agar sangat mudah diinterpretasikan oleh staf non-IT.</li>
+        <li><strong>Ketersediaan (Availability):</strong> Skrip <em>Daemon</em> / berkas kumpulan (<em>Batch Script</em> seperti `1_Jalankan_Server.bat`) disiapkan agar sistem dapat segera dioperasikan (<em>plug and play</em>) setiap kali peladen (<em>Server PC</em>) sekolah dihidupkan ulang.</li>
+    </ul>
+
+    <h3>3.3 Kebutuhan Antarmuka (Interface Requirements)</h3>
+    <ul>
+        <li><strong>Antarmuka Pemrograman Aplikasi (API Interface):</strong> Struktur kembalian (<em>response</em>) dari semua <em>endpoint</em> Laravel wajib menggunakan format seragam berwujud JSON, dengan struktur kunci minimal: `status`, `message`, dan `data`.</li>
+        <li><strong>Antarmuka Media Eksternal (Media Interface):</strong> Koneksi video menggunakan *WebSocket / WebRTC* yang tertanam dalam aplikasi lewat blok HTML <code>&lt;iframe&gt;</code> yang merujuk pada server proksi pihak ketiga yaitu <code>MediaMTX</code>.</li>
+    </ul>
+
+    <hr>
+
+    <h2>4. Skenario Penggunaan (Use Case Requirements)</h2>
+
+    <h3>4.1 Deskripsi Use Case Detail</h3>
+
+    <h4>UC-01: Autentikasi Sistem (Login)</h4>
+    <p><strong>Aktor:</strong> Semua Pengguna (Admin, Management, Staff).<br>
+    <strong>Pra-Kondisi:</strong> Aplikasi Web dalam keadaan siap (<em>Up and Running</em>). Pengguna memiliki ID User yang valid.<br>
+    <strong>Alur Normal:</strong><br>
+    1. Pengguna memuat URL `/login`.<br>
+    2. Sistem menyajikan form login beserta Logo SchoolGuard.<br>
+    3. Pengguna menginput ID User dan Password, lalu menekan tombol Masuk.<br>
+    4. Frontend mengirim permintaan asinkron (Axios) ke API Backend <code>/api/login</code>.<br>
+    5. Backend memeriksa basis data, mencocokkan *hash* Bcrypt, dan mencatat *log* masuk.<br>
+    6. Jika sukses, Backend mengembalikan Token Akses Sanctum. Frontend menyimpannya di penyimpanan lokal (<em>Local Storage</em>) dan mengarahkan pengguna ke halaman Dashboard Utama.<br>
+    <strong>Alur Alternatif:</strong><br>
+    - <em>Kata Sandi Salah:</em> Backend membalas dengan status 401 Unauthorized. UI Frontend memunculkan spanduk eror peringatan merah di atas form input.</p>
+
+    <h4>UC-02: Pemantauan Live CCTV Wall (Grid Monitoring)</h4>
+    <p><strong>Aktor:</strong> Staff Kesiswaan, Management.<br>
+    <strong>Pra-Kondisi:</strong> Aktor telah *Login*. Perangkat kamera dalam keadaan fisik menyala (On). Aplikasi *MediaMTX* sedang memproses arus RTSP di latar belakang peladen.<br>
+    <strong>Alur Normal:</strong><br>
+    1. Pengguna menavigasikan menu ke halaman `Live Monitoring`.<br>
+    2. Sistem memuat komponen React yang memanggil API daftar Kamera Aktif.<br>
+    3. Sistem menyusun kotak-kotak (grid) kamera sejumlah data yang didapat.<br>
+    4. Pada setiap kotak, Frontend memuat komponen `&lt;iframe&gt;` (Rangka WebRTC) untuk menampilkan arus video langsung tanpa suara.<br>
+    5. Pengguna mengarahkan tetikus (<em>hover</em>) pada salah satu video, UI gelap muncul dengan tombol <em>Fullscreen</em>.<br>
+    6. Pengguna mengklik tombol tersebut. Video dipindahkan ke antarmuka <em>Modal Pop-up</em> (melayang) layar penuh yang mendominasi monitor.<br>
+    7. Pengguna mengklik ikon silang [X] untuk kembali ke grid.</p>
+
+    <h4>UC-03: Ekspor Laporan Mingguan</h4>
+    <p><strong>Aktor:</strong> Management Sekolah.<br>
+    <strong>Pra-Kondisi:</strong> Aktor memiliki hak akses minimal 'Management'. Basis data telah berisi rekaman <em>Event Logs</em> dari aktivitas minggu sebelumnya.<br>
+    <strong>Alur Normal:</strong><br>
+    1. Pengguna membuka menu "Laporan".<br>
+    2. Pengguna mengisi bidang penyaringan: Tanggal Mulai = "10 Mei", Tanggal Akhir = "17 Mei". Lalu menekan opsi "Terapkan Filter".<br>
+    3. Tabel pada layar memutakhirkan datanya sesuai tanggal tersebut.<br>
+    4. Pengguna menekan tombol aksi "Cetak Laporan - PDF".<br>
+    5. Peramban web mengirim instruksi permintaan (<em>Request</em>) khusus ke Backend dengan menyertakan rentang tanggal tersebut.<br>
+    6. Sistem (Backend menggunakan pustaka pembentuk PDF) merakit lembaran dokumen PDF dari HTML secara di belakang layar, lalu memaksa peramban (<em>Force Download</em>) untuk mengunduh dokumen laporan jadi berjudul "Laporan_Aktivitas_SchoolGuard.pdf" ke media penyimpanan gawai milik pengguna.</p>
+
+    <h4>UC-04: Transmisi Event (Webhook Trigger)</h4>
+    <p><strong>Aktor:</strong> Kamera CCTV (Sistem Eksternal / IoT Device).<br>
+    <strong>Pra-Kondisi:</strong> Ada manusia yang melintas di depan bidang penglihatan kamera, menabrak garis deteksi maya (<em>virtual line crossing</em>) bawaan CCTV.<br>
+    <strong>Alur Normal (Mesin ke Mesin):</strong><br>
+    1. Kamera menangkap objek "Manusia".<br>
+    2. Kamera menyusun paket data bungkusan berisi struktur XML/JSON.<br>
+    3. Kamera mengirim HTTP POST <em>Request</em> langsung ke IP Peladen SchoolGuard melalui rute <code>/api/webhooks/cctv-ai</code>.<br>
+    4. Controller Backend SchoolGuard menangkap paket data tersebut, mengurainya, dan memastikan bahwa sumber IP adalah asli milik salah satu kamera yang terdaftar di basis data <code>cameras</code>.<br>
+    5. Backend menganalisis jam waktu tiba paket tersebut dengan konfigurasi aturan *Severity Mapping*.<br>
+    6. Kejadian dinyatakan sah dan disuntikkan/dibuatkan entri baris baru pada tabel basis data <code>cctv_events</code>.<br>
+    7. (Pilihan) Jika ada Frontend yang sedang membuka halaman Dashboard, fungsi Auto-refresh Frontend akan segera menampilkan pertambahan grafik secara magis setelah beberapa detik.</p>
+
+    <hr>
+
+    <h2>5. Persyaratan Tambahan (Additional Requirements)</h2>
+
+    <h3>5.1 Mekanisme Jejak Audit (Audit Trail)</h3>
+    <p>SchoolGuard memfasilitasi pelacakan intervensi dan aktivitas operasional untuk menjaga keutuhan administrasi (<em>Compliance</em>). Segala transaksi otentikasi (seperti <em>login berhasil</em>, <em>login gagal</em>, <em>logout</em>) beserta aktivitas pengubahan pengaturan sistem yang fatal oleh akun Administrator secara sistematis dikirim dan direkam ke dalam relasi tabel <code>audit_logs</code>. Catatan log ini memuat detail Waktu, Nama Aktor, Modul yang diakses, serta alamat IP Terminal (komputer) pelaku, membantu pengungkapan kasus sabotase internal (jika ada).</p>
+
+    <h3>5.2 Pencadangan (Backup) dan Pemulihan (Recovery)</h3>
+    <p>Dikarenakan volume baris data pada tabel <code>cctv_events</code> dapat meledak pesat secara logaritma dalam satu semester (seiring dengan tingginya mobilitas siswa yang tertangkap sensor), Tim Administrator diwajibkan untuk menjadwalkan pekerjaan rutin (<em>Cron Job / Windows Task Scheduler</em>) untuk menginisiasi skrip ekspor <code>mysqldump</code>. Basis data dapat dikuras secara opsional (dikosongkan data-data kejadian yang telah berumur lebih dari 1 tahun akademik) untuk mempertahankan efisiensi pencarian kueri (*Query Optimization*) pada grafik *Dashboard*.</p>
+
+    <h3>5.3 Arsitektur Implementasi Jaringan (Deployment Port Architecture)</h3>
+    <p>Tatanan penempatan skema arsitektur peladen pada *Localhost* mengikuti ketentuan isolasi port sebagai berikut:</p>
+    <ul>
+        <li><strong>Port 5173 (TCP)</strong>: Dialokasikan khusus untuk eksekusi server Vite (Node.js) yang memfasilitasi penjelajahan klien (Frontend React SPA).</li>
+        <li><strong>Port 8000 (TCP)</strong>: Ditujukan bagi pelayanan API RESTful dan Webhook oleh skrip PHP Artisan Serve (Backend Laravel).</li>
+        <li><strong>Port 3306 (TCP)</strong>: Akses kompartemen privat untuk mesin pangkalan data (MySQL/MariaDB).</li>
+        <li><strong>Port 8554 (TCP) / Port 8000 (UDP) / Port 8889 (TCP)</strong>: Serangkaian port yang diokupasi oleh peranti lunak MediaMTX. Port 8889 difungsikan untuk meneruskan antarmuka *WebRTC* menuju bingkai komponen HTML di peramban web klien.</li>
+    </ul>
+
+</body>
+</html>

@@ -32,7 +32,7 @@ export function Header() {
   return (
     <header className="h-16 bg-[#0f1420] border-b border-gray-800 flex items-center justify-between px-6">
       <div className="flex items-center gap-3">
-        <div className="size-10 bg-blue-600 rounded-lg flex items-center justify-center">
+        <div className="size-10 bg-emerald-600 rounded-lg flex items-center justify-center">
           <Shield className="size-6 text-white" />
         </div>
         <div>
@@ -52,7 +52,7 @@ export function Header() {
         </button>
 
         <div className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
-          <div className="size-8 bg-blue-600 rounded-full flex items-center justify-center">
+          <div className="size-8 bg-emerald-600 rounded-full flex items-center justify-center">
             <User className="size-4 text-white" />
           </div>
           <div className="text-sm">

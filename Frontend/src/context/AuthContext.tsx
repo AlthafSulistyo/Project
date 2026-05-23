@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const login = async (userId: string, password: string) => {
         try {
-            const response = await axios.post('http://127.0.0.1:8000/api/login', {
+            const response = await axios.post(`http://127.0.0.1:8000/api/login`, {
                 user_id: parseInt(userId),
                 password: password,
             });
@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logout = () => {
         // Call logout API
         if (token) {
-            axios.post('http://127.0.0.1:8000/api/logout')
+            axios.post(`http://127.0.0.1:8000/api/logout`)
                 .catch(err => console.error('Logout API call failed:', err));
         }
 

@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Schedule;
 // Schedule hourly aggregation of CCTV events
 Schedule::command('aggregate:calculate --current')->hourly()->withoutOverlapping();
 
+// NATIVE ISAPI Live Streamer fallback (Not using cron anymore, using Daemon command instead)
+// Schedule::command('isapi:sync-events')->everyMinute()->withoutOverlapping();
+
 // Daily cleanup of old aggregates (runs at 2 AM)
 Schedule::command('aggregate:calculate')->dailyAt('02:00');
 

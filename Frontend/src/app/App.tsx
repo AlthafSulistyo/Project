@@ -91,26 +91,26 @@ function App() {
 
         {/* --- FORM TAMBAH KAMERA (Toggle) --- */}
         {showForm && (
-          <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 animate-in fade-in slide-in-from-top-4">
-            <h3 className="font-bold mb-4 flex items-center gap-2 text-blue-700">
+          <div className="bg-white p-6 rounded-xl shadow-lg border border-emerald-100 animate-in fade-in slide-in-from-top-4">
+            <h3 className="font-bold mb-4 flex items-center gap-2 text-emerald-700">
               <Plus size={20} /> Tambah Perangkat Baru
             </h3>
             <form onSubmit={handleAddCamera} className="flex flex-col md:flex-row gap-4">
               <input 
                 type="text" 
                 placeholder="Nama Kamera (misal: R. Guru)" 
-                className="border p-2 rounded-lg flex-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="border p-2 rounded-lg flex-1 focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={newCamName}
                 onChange={(e) => setNewCamName(e.target.value)}
               />
               <input 
                 type="text" 
                 placeholder="IP Address (misal: 192.168.1.50)" 
-                className="border p-2 rounded-lg flex-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="border p-2 rounded-lg flex-1 focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={newCamIp}
                 onChange={(e) => setNewCamIp(e.target.value)}
               />
-              <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition flex items-center gap-2 justify-center">
+              <button type="submit" className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-emerald-700 transition flex items-center gap-2 justify-center">
                 <Save size={18} /> Simpan
               </button>
               <button type="button" onClick={() => setShowForm(false)} className="text-gray-500 hover:text-gray-700 px-4">
@@ -123,7 +123,7 @@ function App() {
         {/* --- GRAFIK --- */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-6">
-            <div className="p-2 bg-blue-100 rounded-lg text-blue-600"><Activity size={20} /></div>
+            <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><Activity size={20} /></div>
             <h2 className="text-lg font-semibold">Statistik Deteksi Mingguan</h2>
           </div>
           <div className="h-[250px] w-full">
@@ -158,7 +158,7 @@ function App() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {cameras.map((cam) => (
-              <div key={cam.id} className="group bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-300 transition-all duration-300">
+              <div key={cam.id} className="group bg-white rounded-xl overflow-hidden shadow-sm border border-gray-200 hover:shadow-md hover:border-emerald-300 transition-all duration-300">
                 <div className="relative h-48 bg-gray-100 group-hover:opacity-90 transition">
                   <img src={cam.thumbnail} alt={cam.name} className="w-full h-full object-cover" />
                   <div className="absolute top-3 right-3 flex gap-2">

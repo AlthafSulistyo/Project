@@ -14,7 +14,7 @@ const Sidebar = () => {
     <aside className="w-64 bg-slate-900 text-white h-screen fixed left-0 top-0 flex flex-col border-r border-slate-800">
       {/* Logo Area */}
       <div className="p-6 border-b border-slate-800">
-        <h1 className="text-xl font-bold text-blue-400">SchoolGuard AI</h1>
+        <h1 className="text-xl font-bold text-emerald-400">SchoolGuard AI</h1>
         <p className="text-xs text-slate-400">SMAS Plus Cendekia</p>
       </div>
 
@@ -28,7 +28,7 @@ const Sidebar = () => {
               to={item.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                 isActive 
-                  ? 'bg-blue-600 text-white' 
+                  ? 'bg-emerald-600 text-white' 
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >

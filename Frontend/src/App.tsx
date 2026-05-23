@@ -17,11 +17,7 @@ function App() {
           <Route path="/login" element={<Login />} />
 
           {/* Protected Routes */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <MainLayout />
-            </ProtectedRoute>
-          }>
+          <Route path="/" element={<MainLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="live" element={<LiveMonitoring />} />
             <Route path="laporan" element={<Laporan />} />
@@ -37,3 +33,4 @@ function App() {
 }
 
 export default App;
+

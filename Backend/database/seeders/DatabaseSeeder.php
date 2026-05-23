@@ -38,10 +38,10 @@ class DatabaseSeeder extends Seeder
             'role' => 'staff',
         ]);
 
-        // Seed cameras and events
+        // Seed cameras and events (3 days only: Jan 12-14)
         $this->call([
             CameraSeeder::class,
-            CctvEventSeeder::class,
+            TodayEventsSeeder::class, // Use TodayEventsSeeder instead of CctvEventSeeder for controlled dates
         ]);
     }
 }

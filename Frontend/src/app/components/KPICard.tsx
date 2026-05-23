@@ -21,7 +21,7 @@ export function KPICard({
 }: KPICardProps) {
   const accentColors = {
     red: 'bg-red-600',
-    blue: 'bg-blue-600',
+    blue: 'bg-emerald-600',
     green: 'bg-green-600',
   };
 

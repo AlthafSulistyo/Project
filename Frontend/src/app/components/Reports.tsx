@@ -74,7 +74,7 @@ export function Reports() {
           return (
             <div key={index} className="bg-[#0f1420] border border-gray-800 rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
-                <Icon className="size-8 text-blue-400" />
+                <Icon className="size-8 text-emerald-400" />
                 {card.trend === 'up' ? (
                   <TrendingUp className="size-4 text-green-400" />
                 ) : (
@@ -97,7 +97,7 @@ export function Reports() {
       <div className="bg-[#0f1420] border border-gray-800 rounded-lg p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-white text-lg">Recent Reports</h3>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
             <FileText className="size-4" />
             Generate New Report
           </button>
@@ -110,7 +110,7 @@ export function Reports() {
               className="flex items-center justify-between p-4 bg-gray-900/50 border border-gray-800 rounded-lg hover:bg-gray-900 transition-colors"
             >
               <div className="flex items-center gap-4">
-                <div className="size-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                <div className="size-12 bg-emerald-600 rounded-lg flex items-center justify-center">
                   <FileText className="size-6 text-white" />
                 </div>
                 <div>

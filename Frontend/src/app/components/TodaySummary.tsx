@@ -40,9 +40,9 @@ export function TodaySummary() {
         ))}
       </div>
 
-      <div className="mt-6 p-4 bg-blue-900/20 border border-blue-800 rounded-lg">
+      <div className="mt-6 p-4 bg-emerald-900/20 border border-emerald-800 rounded-lg">
         <div className="flex items-start gap-3">
-          <Camera className="size-5 text-blue-400 mt-1" />
+          <Camera className="size-5 text-emerald-400 mt-1" />
           <div>
             <div className="text-white text-sm">System Status</div>
             <div className="text-gray-400 text-xs mt-1">

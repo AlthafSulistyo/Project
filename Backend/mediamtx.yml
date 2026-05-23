@@ -1,0 +1,36 @@
+paths:
+  cam_1:
+    source: rtsp://admin:Hikv2024@192.168.18.76:554/Streaming/Channels/101
+  cam_2:
+    source: rtsp://admin:Hikv2024@192.168.18.5:554/Streaming/Channels/101
+  cam_3:
+    source: rtsp://admin:Hikv2024@192.168.18.3:554/Streaming/Channels/101
+  cam_4:
+    source: rtsp://admin:Hikv2024@192.168.18.8:554/Streaming/Channels/101
+  cam_5:
+    source: rtsp://admin:Hikv2024@192.168.18.16:554/Streaming/Channels/101
+  cam_6:
+    source: rtsp://admin:Hikv2024@192.168.18.6:554/Streaming/Channels/101
+  cam_7:
+    source: rtsp://admin:Hikv2024@192.168.18.10:554/Streaming/Channels/101
+  cam_8:
+    source: rtsp://admin:Hikv2024@192.168.18.18:554/Streaming/Channels/101
+  cam_9:
+    source: rtsp://admin:Hikv2024@192.168.18.15:554/Streaming/Channels/101
+  cam_10:
+    source: rtsp://admin:Hikv2024@192.168.18.9:554/Streaming/Channels/101
+  cam_11:
+    source: rtsp://admin:Hikv2024@192.168.18.13:554/Streaming/Channels/101
+  cam_12:
+    source: rtsp://admin:Hikv2024@192.168.18.7:554/Streaming/Channels/101
+  cam_13:
+    source: rtsp://admin:Hikv2024@192.168.18.12:554/Streaming/Channels/101
+  cam_14:
+    source: rtsp://admin:Hikv2024@192.168.18.17:554/Streaming/Channels/101
+  cam_15:
+    source: rtsp://admin:Hikv2024@192.168.18.14:554/Streaming/Channels/101
+  cam_16:
+    source: rtsp://admin:Hikv2024@192.168.18.4:554/Streaming/Channels/101
+
+webrtc: yes
+webrtcAddress: :8889

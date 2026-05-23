@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\CctvEvent;
 use App\Models\AuditLog;
+use App\Mail\ReportEmail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReportController extends Controller
@@ -36,7 +38,8 @@ class ReportController extends Controller
             $query->where('severity', $request->severity);
         }
 
-        $events = $query->orderBy('created_at', 'desc')->get();
+        // Untuk PDF, batasi maksimal data karena DOMPDF sangat berat merender ribuan baris HTML.
+        $events = $query->orderBy('created_at', 'desc')->take(300)->get();
 
         // Statistics
         $stats = [
@@ -54,17 +57,14 @@ class ReportController extends Controller
             "Exported PDF report: {$request->start_date} to {$request->end_date}, {$events->count()} events"
         );
 
-        // Generate PDF
-        $pdf = Pdf::loadView('reports.pdf', [
+        // Generate PDF using our new template
+        $pdf = Pdf::loadView('reports.events-pdf', [
             'events' => $events,
-            'stats' => $stats,
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
-            'generated_by' => auth()->user()->name,
-            'generated_at' => now()->format('d M Y, H:i'),
+            'startDate' => $request->start_date,
+            'endDate' => $request->end_date,
         ]);
 
-        $filename = 'Laporan_CCTV_' . $request->start_date . '_to_' . $request->end_date . '.pdf';
+        $filename = 'Laporan_Aktivitas_' . date('Y-m-d_His') . '.pdf';
 
         return $pdf->download($filename);
     }
@@ -135,5 +135,56 @@ class ReportController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Send report via email with PDF attachment
+     */
+    public function sendEmail(Request $request)
+    {
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ]);
+
+        // Fetch filtered events
+        $query = CctvEvent::with('camera')
+            ->whereBetween('created_at', [
+                $request->start_date . ' 00:00:00',
+                $request->end_date . ' 23:59:59'
+            ]);
+
+        $events = $query->orderBy('created_at', 'desc')->get();
+
+        // Generate PDF
+        $pdf = Pdf::loadView('reports.events-pdf', [
+            'events' => $events,
+            'startDate' => $request->start_date,
+            'endDate' => $request->end_date,
+        ]);
+
+        $pdfContent = $pdf->output();
+
+        // Send email with PDF attachment
+        try {
+            Mail::to('alth22227si@student.nurulfikri.ac.id')
+                ->send(new ReportEmail($pdfContent, $request->start_date, $request->end_date));
+
+            // Log email activity
+            AuditLog::log(
+                'send_report_email',
+                "Sent PDF report via email: {$request->start_date} to {$request->end_date}, {$events->count()} events"
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => '✅ Laporan berhasil dikirim ke email alth22227si@student.nurulfikri.ac.id'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => '❌ Gagal mengirim email: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

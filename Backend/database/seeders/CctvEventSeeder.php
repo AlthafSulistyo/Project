@@ -11,10 +11,10 @@ class CctvEventSeeder extends Seeder
 {
     public function run(): void
     {
-        $camera = Camera::where('name', 'CAM_01_Kelas_9.1')->first();
+        $camera = Camera::where('name', 'CAM_01_Kelas_10.1')->first();
 
         if (!$camera) {
-            $this->command->warn('Camera CAM_01_Kelas_9.1 not found.');
+            $this->command->warn('Camera CAM_01_Kelas_10.1 not found.');
             return;
         }
 

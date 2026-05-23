@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useLocation } from 'react-router-dom';
 import { FileText, Download, Calendar, Filter, Search, Printer, Eye, Video } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,43 +12,49 @@ interface CctvEvent {
     severity: 'high' | 'medium' | 'low';
     is_reviewed: boolean;
     created_at: string;
+    snapshot_path?: string;
 }
 
 export default function Laporan() {
     const { hasAnyRole } = useAuth(); // Add role checking
+    const location = useLocation();
     const [logs, setLogs] = useState<CctvEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterType, setFilterType] = useState('all');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 34; // 100 data / 3 halaman ≈ 34 per halaman
 
     // Modal state
     const [showModal, setShowModal] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<CctvEvent | null>(null);
 
-    // Nama kamera tunggal yang kita fokuskan
-    const SINGLE_CAM_NAME = "CAM_01_Kelas_9.1";
-
     // Fetch logs from API
-    const fetchLogs = async () => {
+    const fetchLogs = async (silent = false) => {
         try {
-            const response = await axios.get('http://127.0.0.1:8000/api/cctv-events');
+            if (!silent) setLoading(true);
+            const response = await axios.get(`http://127.0.0.1:8000/api/cctv-events`);
 
             // Laravel Resource Collection returns: response.data.data (pagination wrapper)
             const rawData = response.data.data;
 
-            // Override camera name untuk konsistensi dengan single camera view
-            const singleCamData = rawData.map((item: CctvEvent) => ({
-                ...item,
-                camera_name: SINGLE_CAM_NAME
-            }));
+            setLogs(rawData);
+            if (!silent) setLoading(false);
 
-            setLogs(singleCamData);
-            setLoading(false);
+            if (location.state?.selectedEventId) {
+                const targetEvent = rawData.find((e: CctvEvent) => e.id === location.state.selectedEventId);
+                if (targetEvent) {
+                    setSelectedEvent(targetEvent);
+                    setShowModal(true);
+                }
+                // Hapus state dari history agar tidak auto-open kalau user refresh halaman
+                window.history.replaceState({}, document.title);
+            }
         } catch (error) {
             console.error('Error fetching logs:', error);
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -93,46 +100,16 @@ export default function Laporan() {
     };
 
     useEffect(() => {
-        fetchLogs();
+        fetchLogs(); // Fetch pertama kali saat render
+
+        // Auto-refresh setiap 5 detik secara silent (tanpa animasi loading)
+        const intervalId = setInterval(() => {
+            fetchLogs(true);
+        }, 5000);
+
+        // Bersihkan interval ketika komponen di-unmount
+        return () => clearInterval(intervalId);
     }, []);
-
-    const handleExportCSV = () => {
-        // Filter events based on current filters
-        let dataToExport = filteredLogs; // Use filteredLogs to export what's currently displayed
-
-        // CSV Headers
-        const headers = ['Waktu Kejadian', 'Sumber Kamera', 'Objek Terdeteksi', 'Tingkat Risiko', 'Status'];
-
-        // Convert data to CSV rows
-        const csvRows = [
-            headers.join(','), // Header row
-            ...dataToExport.map(event => [
-                new Date(event.created_at).toLocaleString('id-ID'),
-                event.camera_name || 'CAM_01_Kelas_9.1',
-                event.event_type.replace(/_/g, ' ').toUpperCase(),
-                event.severity.toUpperCase(),
-                event.is_reviewed ? 'Reviewed' : 'New'
-            ].map(field => `"${field}"`).join(',')) // Wrap fields in quotes for CSV safety
-        ];
-
-        // Create CSV content
-        const csvContent = csvRows.join('\n');
-
-        // Create blob and download
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-
-        // Generate filename with date
-        const filename = `Laporan_CCTV_${new Date().toISOString().split('T')[0]}.csv`;
-
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
 
     // Export to PDF
     const handleExportPDF = () => {
@@ -231,58 +208,76 @@ export default function Laporan() {
         })
         .filter(log => log.event_type.toLowerCase().includes(searchTerm.toLowerCase()));
 
+    // Pagination Logic
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = filteredLogs.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+
+    // Reset pagination to first page when any filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterType, startDate, endDate, searchTerm]);
+
     return (
         <div className="p-6 space-y-6">
 
             {/* HEADER */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <FileText className="text-blue-600" /> Laporan Aktivitas
+                    <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2 tracking-tight">
+                        <FileText className="text-emerald-500" /> Laporan Aktivitas
                     </h1>
-                    <p className="text-slate-500 text-sm flex items-center gap-1">
+                    <p className="text-slate-400 text-sm flex items-center gap-1 mt-1">
                         <Video size={12} />
-                        Data Log untuk: <span className="font-mono font-bold text-slate-700">{SINGLE_CAM_NAME}</span>
+                        Data Log untuk: <span className="font-mono font-bold text-slate-300 bg-[#1e293b] px-2 py-0.5 rounded border border-slate-700">Semua Kamera Aktif</span>
                     </p>
                 </div>
 
                 <div className="flex gap-2 flex-wrap">
-                    <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition text-sm font-medium">
+                    <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-[#1e293b] border border-slate-700 text-slate-200 rounded-lg hover:bg-slate-800 hover:text-white transition text-sm font-medium">
                         <Printer size={16} /> Print
                     </button>
 
                     {/* PDF & Excel: Admin and Management only */}
                     {hasAnyRole(['admin', 'management']) && (
                         <>
-                            <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium shadow-sm">
+                            <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2 bg-rose-600/80 text-white border border-rose-500/50 rounded-lg hover:bg-rose-600 transition text-sm font-medium shadow-sm">
                                 <Download size={16} /> Export PDF
                             </button>
-                            <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium shadow-sm">
+                            <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600/80 text-white border border-emerald-500/50 rounded-lg hover:bg-emerald-600 transition text-sm font-medium shadow-sm">
                                 <Download size={16} /> Export Excel
                             </button>
                         </>
                     )}
-
-                    {/* CSV: Available to all users */}
-                    <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm">
-                        <Download size={16} /> Export CSV
-                    </button>
                 </div>
             </div>
 
             {/* FILTER BAR */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="bg-[#0f172a] p-4 rounded-xl shadow-lg border border-slate-800/50 ring-1 ring-white/5 flex flex-col md:flex-row gap-4 items-center justify-between">
 
                 {/* Input Tanggal */}
                 <div className="flex items-center gap-2 w-full md:w-auto">
                     <div className="relative group flex-1">
                         <Calendar size={16} className="absolute left-3 top-3 text-slate-400" />
-                        <input type="date" className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full" />
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="pl-9 pr-4 py-2 bg-[#1e293b] border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full color-scheme-dark"
+                            style={{ colorScheme: 'dark' }}
+                        />
                     </div>
-                    <span className="text-slate-400 text-sm">-</span>
+                    <span className="text-slate-500 text-sm">-</span>
                     <div className="relative group flex-1">
                         <Calendar size={16} className="absolute left-3 top-3 text-slate-400" />
-                        <input type="date" className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full" />
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="pl-9 pr-4 py-2 bg-[#1e293b] border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full color-scheme-dark"
+                            style={{ colorScheme: 'dark' }}
+                        />
                     </div>
                 </div>
 
@@ -292,7 +287,7 @@ export default function Laporan() {
                         <Filter size={16} className="absolute left-3 top-3 text-slate-400" />
                         <select
                             onChange={(e) => setFilterType(e.target.value)}
-                            className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full appearance-none cursor-pointer"
+                            className="pl-9 pr-4 py-2 bg-[#1e293b] border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full appearance-none cursor-pointer"
                         >
                             <option value="all">Semua Status</option>
                             <option value="high">Bahaya (High)</option>
@@ -303,13 +298,19 @@ export default function Laporan() {
                     <div className="relative flex-1 md:w-64">
                         <Search size={16} className="absolute left-3 top-3 text-slate-400" />
                         {/* Search difokuskan ke tipe kejadian karena kamera cuma satu */}
-                        <input type="text" placeholder="Cari jenis deteksi..." className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full" />
+                        <input
+                            type="text"
+                            placeholder="Cari jenis deteksi..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-9 pr-4 py-2 bg-[#1e293b] border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full"
+                        />
                     </div>
                 </div>
             </div>
 
             {/* TABEL DATA */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
+            <div className="bg-[#0f172a] rounded-xl shadow-lg border border-slate-800/50 ring-1 ring-white/5 overflow-hidden min-h-[400px]">
                 {loading ? (
                     <div className="p-10 text-center text-slate-500 animate-pulse">
                         <p>Mengunduh data log...</p>
@@ -317,7 +318,7 @@ export default function Laporan() {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-xs border-b border-slate-200">
+                            <thead className="bg-[#1e293b]/50 text-slate-400 uppercase font-bold text-xs border-b border-slate-800/50 tracking-wider">
                                 <tr>
                                     <th className="px-6 py-4">Waktu Kejadian</th>
                                     <th className="px-6 py-4">Sumber Kamera</th>
@@ -327,44 +328,44 @@ export default function Laporan() {
                                     <th className="px-6 py-4 text-center">Bukti</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredLogs.length > 0 ? filteredLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-6 py-4 text-slate-600 font-mono">
+                            <tbody className="divide-y divide-slate-800/50">
+                                {currentItems.length > 0 ? currentItems.map((log) => (
+                                    <tr key={log.id} className="hover:bg-[#1e293b]/50 transition-colors group">
+                                        <td className="px-6 py-4 text-slate-400 font-mono">
                                             {new Date(log.created_at).toLocaleString('id-ID', {
                                                 day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
                                             })}
                                         </td>
-                                        <td className="px-6 py-4 font-medium text-slate-800">
+                                        <td className="px-6 py-4 font-medium text-slate-200">
                                             {log.camera_name}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className="font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded border border-slate-200 text-xs">
+                                            <span className="font-semibold text-slate-300 bg-slate-800 px-2 py-1 rounded border border-slate-700 text-xs">
                                                 {log.event_type.toUpperCase()}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
                                             {log.severity === 'high' ? (
-                                                <span className="text-red-700 bg-red-50 px-3 py-1 rounded-full text-xs font-bold border border-red-100 flex items-center gap-1 w-fit">
-                                                    <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span> HIGH
+                                                <span className="text-rose-400 bg-rose-500/10 px-3 py-1 rounded-full text-xs font-bold border border-rose-500/20 flex items-center gap-1 w-fit shadow-[0_0_10px_rgba(244,63,94,0.1)]">
+                                                    <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse shadow-[0_0_5px_rgba(244,63,94,0.8)]"></span> HIGH
                                                 </span>
                                             ) : log.severity === 'medium' ? (
-                                                <span className="text-yellow-700 bg-yellow-50 px-3 py-1 rounded-full text-xs font-bold border border-yellow-100 flex items-center gap-1 w-fit">
-                                                    <span className="w-2 h-2 bg-yellow-500 rounded-full"></span> MEDIUM
+                                                <span className="text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full text-xs font-bold border border-amber-500/20 flex items-center gap-1 w-fit shadow-[0_0_10px_rgba(245,158,11,0.1)]">
+                                                    <span className="w-2 h-2 bg-amber-500 rounded-full"></span> MEDIUM
                                                 </span>
                                             ) : (
-                                                <span className="text-green-700 bg-green-50 px-3 py-1 rounded-full text-xs font-bold border border-green-100 flex items-center gap-1 w-fit">
-                                                    <span className="w-2 h-2 bg-green-500 rounded-full"></span> LOW
+                                                <span className="text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/20 flex items-center gap-1 w-fit shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                                                    <span className="w-2 h-2 bg-emerald-500 rounded-full"></span> LOW
                                                 </span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
                                             {log.is_reviewed ? (
-                                                <span className="text-slate-500 text-xs flex items-center gap-1">
+                                                <span className="text-emerald-500 text-xs flex items-center gap-1 font-medium">
                                                     ✅ Reviewed
                                                 </span>
                                             ) : (
-                                                <span className="text-blue-600 text-xs font-bold flex items-center gap-1">
+                                                <span className="text-amber-400 text-xs font-bold flex items-center gap-1 animate-pulse">
                                                     🆕 New
                                                 </span>
                                             )}
@@ -375,7 +376,7 @@ export default function Laporan() {
                                                     setSelectedEvent(log);
                                                     setShowModal(true);
                                                 }}
-                                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition group-hover:bg-white group-hover:shadow-sm border border-transparent group-hover:border-slate-200"
+                                                className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-full transition group-hover:bg-[#1e293b] border border-transparent group-hover:border-slate-700 shadow-sm"
                                                 title="Lihat Detail Event"
                                             >
                                                 <Eye size={18} />
@@ -384,7 +385,7 @@ export default function Laporan() {
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                                        <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                                             <div className="flex flex-col items-center gap-2">
                                                 <Search size={32} className="opacity-20" />
                                                 <p>Tidak ada data kejadian ditemukan untuk filter ini.</p>
@@ -398,29 +399,43 @@ export default function Laporan() {
                 )}
 
                 {/* Pagination */}
-                <div className="p-4 border-t border-slate-200 flex justify-between items-center bg-slate-50/50">
-                    <span className="text-xs text-slate-500">Menampilkan {filteredLogs.length} entri terbaru</span>
+                <div className="p-4 border-t border-slate-800/50 flex justify-between items-center bg-[#1e293b]/30">
+                    <span className="text-xs text-slate-500">
+                        Menampilkan {filteredLogs.length === 0 ? 0 : indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredLogs.length)} dari {filteredLogs.length} entri mencurigakan (Halaman {currentPage} dari {totalPages || 1})
+                    </span>
                     <div className="flex gap-2">
-                        <button className="px-3 py-1 bg-white border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50" disabled>Sebelumnya</button>
-                        <button className="px-3 py-1 bg-white border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-100">Selanjutnya</button>
+                        <button 
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            className="px-3 py-1 bg-[#1e293b] border border-slate-700 rounded text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50 transition" 
+                            disabled={currentPage <= 1}
+                        >
+                            Sebelumnya
+                        </button>
+                        <button 
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            className="px-3 py-1 bg-[#1e293b] border border-slate-700 rounded text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50 transition"
+                            disabled={currentPage >= totalPages || totalPages === 0}
+                        >
+                            Selanjutnya
+                        </button>
                     </div>
                 </div>
             </div>
 
             {/* MODAL DETAIL EVENT */}
             {showModal && selectedEvent && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+                    <div className="bg-[#0f172a] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto ring-1 ring-white/10" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white">
+                        <div className="bg-gradient-to-r from-emerald-900/40 to-[#0f172a] p-6 border-b border-slate-800">
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <h2 className="text-2xl font-bold mb-1">Detail Kejadian CCTV</h2>
-                                    <p className="text-blue-100 text-sm">Event ID: #{selectedEvent.id}</p>
+                                    <h2 className="text-xl sm:text-2xl font-bold mb-1 text-slate-100">Detail Kejadian CCTV</h2>
+                                    <p className="text-slate-400 text-xs sm:text-sm font-mono">Event ID: #{selectedEvent.id}</p>
                                 </div>
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-lg transition"
+                                    className="text-slate-400 hover:text-slate-200 bg-slate-800/50 hover:bg-slate-800 p-2 rounded-lg transition"
                                 >
                                     ✕
                                 </button>
@@ -430,10 +445,10 @@ export default function Laporan() {
                         {/* Content */}
                         <div className="p-6 space-y-6">
                             {/* Event Info Grid */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                    <div className="text-xs text-slate-500 mb-1">⏰ Waktu Kejadian</div>
-                                    <div className="font-semibold text-slate-800">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="bg-[#1e293b] p-4 rounded-lg border border-slate-800/50">
+                                    <div className="text-xs text-slate-400 mb-1 font-medium">⏰ Waktu Kejadian</div>
+                                    <div className="font-semibold text-slate-200 text-sm">
                                         {new Date(selectedEvent.created_at).toLocaleString('id-ID', {
                                             weekday: 'long',
                                             year: 'numeric',
@@ -446,52 +461,60 @@ export default function Laporan() {
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                    <div className="text-xs text-slate-500 mb-1">📹 Sumber Kamera</div>
-                                    <div className="font-semibold text-slate-800">{selectedEvent.camera_name}</div>
+                                <div className="bg-[#1e293b] p-4 rounded-lg border border-slate-800/50">
+                                    <div className="text-xs text-slate-400 mb-1 font-medium">📹 Sumber Kamera</div>
+                                    <div className="font-semibold text-slate-200 text-sm">{selectedEvent.camera_name}</div>
                                 </div>
 
-                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                    <div className="text-xs text-slate-500 mb-1">🎯 Objek Terdeteksi</div>
-                                    <div className="font-bold text-slate-800">{selectedEvent.event_type.toUpperCase()}</div>
+                                <div className="bg-[#1e293b] p-4 rounded-lg border border-slate-800/50">
+                                    <div className="text-xs text-slate-400 mb-1 font-medium">🎯 Objek Terdeteksi</div>
+                                    <div className="font-bold text-slate-200 text-sm">{selectedEvent.event_type.toUpperCase()}</div>
                                 </div>
 
-                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                    <div className="text-xs text-slate-500 mb-1">⚠️ Tingkat Risiko</div>
-                                    <div className="font-bold">
+                                <div className="bg-[#1e293b] p-4 rounded-lg border border-slate-800/50">
+                                    <div className="text-xs text-slate-400 mb-1 font-medium">⚠️ Tingkat Risiko</div>
+                                    <div className="font-bold text-sm mt-1">
                                         {selectedEvent.severity === 'high' ? (
-                                            <span className="text-red-600">🔴 HIGH</span>
+                                            <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">🔴 HIGH</span>
                                         ) : selectedEvent.severity === 'medium' ? (
-                                            <span className="text-yellow-600">🟡 MEDIUM</span>
+                                            <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">🟡 MEDIUM</span>
                                         ) : (
-                                            <span className="text-green-600">🟢 LOW</span>
+                                            <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">🟢 LOW</span>
                                         )}
                                     </div>
                                 </div>
                             </div>
 
                             {/* Snapshot Preview */}
-                            <div className="bg-slate-100 rounded-lg p-4 border-2 border-dashed border-slate-300">
-                                <div className="text-center text-slate-500 py-12">
-                                    <div className="text-6xl mb-4">📷</div>
-                                    <p className="font-semibold">Snapshot Tidak Tersedia</p>
-                                    <p className="text-sm mt-2">Bukti visual akan muncul setelah integrasi dengan kamera CCTV</p>
-                                    <p className="text-xs mt-1 text-slate-400">(Requires Hikvision ISAPI Connection)</p>
-                                </div>
+                            <div className="bg-slate-950 rounded-lg p-4 border border-slate-800 ring-1 ring-white/5">
+                                {selectedEvent.snapshot_path ? (
+                                    <img 
+                                        src={`http://127.0.0.1:8000/${selectedEvent.snapshot_path}`} 
+                                        alt="CCTV Snapshot" 
+                                        className="w-full h-auto rounded-md object-contain max-h-[400px] border border-slate-800/80" 
+                                    />
+                                ) : (
+                                    <div className="text-center text-slate-500 py-12">
+                                        <div className="text-6xl mb-4 opacity-50">📷</div>
+                                        <p className="font-semibold text-slate-400">Snapshot Tidak Tersedia</p>
+                                        <p className="text-sm mt-2">Kamera tidak menangkap snapshot untuk event ini</p>
+                                        <p className="text-xs mt-1 text-slate-600">(A past event or non-camera manual trigger)</p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Status */}
-                            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <div className="flex items-center justify-between p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
                                 <div>
-                                    <div className="text-xs text-blue-600 mb-1">Status Review</div>
-                                    <div className="font-bold text-blue-800">
+                                    <div className="text-xs text-emerald-400 mb-1 font-medium">Status Review</div>
+                                    <div className="font-bold text-emerald-300">
                                         {selectedEvent.is_reviewed ? '✅ Sudah Direview' : '🆕 Belum Direview'}
                                     </div>
                                 </div>
                                 {!selectedEvent.is_reviewed && (
                                     <button
                                         onClick={() => handleMarkReviewed(selectedEvent.id)}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition text-sm font-medium shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]"
                                     >
                                         Tandai Direview
                                     </button>
@@ -500,10 +523,10 @@ export default function Laporan() {
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+                        <div className="px-6 py-4 bg-[#1e293b]/50 border-t border-slate-800 flex justify-end gap-2">
                             <button
                                 onClick={() => setShowModal(false)}
-                                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition text-sm font-medium"
+                                className="px-4 py-2 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 hover:text-white transition text-sm font-medium"
                             >
                                 Tutup
                             </button>
