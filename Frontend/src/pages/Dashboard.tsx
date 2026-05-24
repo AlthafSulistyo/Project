@@ -189,9 +189,9 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 2. WEEKLY TREND */}
-        <div className="lg:col-span-2 bg-[#0f172a] p-4 sm:p-6 rounded-xl shadow-lg border border-slate-800/50 ring-1 ring-white/5">
-            <h3 className="font-bold text-slate-100 mb-6 text-lg tracking-tight">Tren Aktivitas Sepekan</h3>
-            <div className="h-[320px]">
+        <div className="lg:col-span-2 bg-[#0f172a] p-4 sm:p-6 rounded-xl shadow-lg border border-slate-800/50 ring-1 ring-white/5 min-w-0">
+            <h3 className="font-bold text-slate-100 mb-6 text-lg tracking-tight truncate">Tren Aktivitas Sepekan</h3>
+            <div className="h-[320px] w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={stats.weekly_trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
