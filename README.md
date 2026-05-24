@@ -38,6 +38,13 @@ SchoolGuard adalah aplikasi dashboard pemantauan CCTV berbasis web yang dirancan
 * **Audit Logs:** Pencatatan seluruh aktivitas pengguna sistem
 * **Real-time Notifications:** Peringatan otomatis untuk kejadian kritis
 
+### 🧠 Computer Vision & AI Implementation (YOLOv8)
+Sistem ini secara khusus mengimplementasikan **YOLOv8 (You Only Look Once)** untuk mendeteksi objek dan menganalisis aktivitas:
+* **Deteksi Objek Real-time:** Menggunakan model `yolov8n` (versi Nano) yang dioptimasi dengan format NCNN agar sangat ringan, dapat dijalankan secara efisien tanpa memerlukan spesifikasi server yang terlalu tinggi.
+* **Smart Motion Differencing:** Model AI tidak memproses video yang kosong secara terus-menerus. YOLOv8 hanya akan *triggered* jika sistem mendeteksi adanya pergerakan piksel. Teknik ini menghemat penggunaan komputasi (CPU) secara drastis.
+* **Context-Aware Logic:** Algoritma mengkalkulasi jumlah orang aktif (*active persons*), kedekatan/ukuran objek di layar, dan mencocokkannya dengan jadwal harian (seperti jam istirahat atau jam pelajaran) untuk menentukan tingkat keparahan (*Severity Level*: Low, Medium, High).
+* **Visual Alerting:** Menandai target secara otomatis dengan *bounding box* pada foto kejadian sesaat sebelum notifikasi (webhook) dikirim ke staf sekolah.
+
 ### ⚙️ Pengaturan Sistem
 * Manajemen kamera (CRUD operations)
 * Konfigurasi notifikasi
@@ -62,6 +69,12 @@ SchoolGuard adalah aplikasi dashboard pemantauan CCTV berbasis web yang dirancan
 * **Authentication:** Laravel Sanctum
 * **PDF Generation:** DomPDF
 * **Excel Export:** PhpSpreadsheet
+
+### AI & Computer Vision
+* **Model:** Ultralytics YOLOv8 (yolov8n / NCNN format)
+* **Image Processing:** OpenCV (cv2)
+* **Environment:** Python 3 + ultralytics
+* **Integration:** Webhook REST API
 
 ### Development Tools
 * **IDE:** Visual Studio Code
