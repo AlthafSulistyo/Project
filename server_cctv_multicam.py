@@ -21,7 +21,7 @@ logging.basicConfig(
 
 logging.info("Memulai inisialisasi Firebase Admin SDK...")
 try:
-    cred = credentials.Certificate("schoolguard-648f4-firebase-adminsdk-fbsvc-e2ad46af2e.json")
+    cred = credentials.Certificate("schoolguard-648f4-firebase-adminsdk-fbsvc-44307f897d.json")
     firebase_admin.initialize_app(cred, {
         'storageBucket': 'schoolguard-648f4.firebasestorage.app'
     })
@@ -108,7 +108,7 @@ def send_firebase_alert(camera_name, category, severity, message, active_count, 
     # 2. Simpan Data ke Firestore
     payload = {
         "camera_name": camera_name,
-        "timestamp": datetime.now(), # Firestore akan mengkonversi ini ke Timestamp type
+        "timestamp": firestore.SERVER_TIMESTAMP, # Menggunakan waktu asli server Firebase agar zona waktu akurat
         "category": category,
         "severity": severity,
         "message": message,

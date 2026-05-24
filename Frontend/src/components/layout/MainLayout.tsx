@@ -148,7 +148,7 @@ const MainLayout = () => {
       </aside>
 
       {/* --- KONTEN UTAMA (KANAN) --- */}
-      <div className="flex-1 md:ml-64 transition-all flex flex-col">
+      <div className="flex-1 md:ml-64 transition-all flex flex-col min-w-0 overflow-x-hidden">
 
         {/* HEADER ATAS (TOPBAR) */}
         <header className="bg-[#0f172a]/90 backdrop-blur-md shadow-sm border-b border-slate-800 h-16 flex items-center justify-between px-6 sticky top-0 z-20">
