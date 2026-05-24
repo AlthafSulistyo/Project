@@ -80,67 +80,85 @@ export default function LiveMonitoring() {
 
             {/* GRID KAMERA (Responsive) */}
             <div className="flex-1 overflow-y-auto pr-2 pb-8 custom-scrollbar">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                    {cameras.map((camera) => (
-                        <div 
-                            key={camera.id} 
-                            className="bg-black rounded-xl overflow-hidden relative group border border-slate-800 shadow-xl min-h-[220px] cursor-crosshair"
-                        >
-                            {/* LIVE WEBRTC STREAM FROM MEDIAMTX */}
-                            <div className="absolute inset-0 bg-slate-900 animate-pulse -z-10"></div>
-                            <iframe 
-                                src={`http://127.0.0.1:8889/${camera.mtxPath}/`} 
-                                title={camera.name}
-                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition duration-700 contrast-125 scale-105"
-                                frameBorder="0"
-                                scrolling="no"
-                                allow="autoplay; fullscreen"
-                                style={{ pointerEvents: 'none' }}
-                            ></iframe>
-
-                            {/* Efek Scanline Buatan dengan CSS */}
-                            <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px] pointer-events-none opacity-50 mix-blend-overlay"></div>
-
-                            {/* Overlay Top: Status & Name */}
-                            <div className="absolute top-0 left-0 w-full p-3 bg-gradient-to-b from-black/80 to-transparent pointer-events-none flex justify-between items-start">
-                                <div className="flex gap-2 items-center">
-                                    <div className="w-2.5 h-2.5 bg-red-600 rounded-full animate-ping shadow-[0_0_8px_rgba(220,38,38,0.8)]"></div>
-                                    <span className="text-white text-xs font-mono font-bold tracking-wider">{camera.name}</span>
-                                </div>
-                                <div className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg">LIVE</div>
-                            </div>
-
-                            {/* Overlay Bottom: Location & Timestamp */}
-                            <div className="absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/90 to-transparent pointer-events-none flex justify-between items-end">
-                                <div className="text-emerald-400 font-mono text-xs flex items-center gap-1.5 opacity-90">
-                                    <MapPin size={12} /> {camera.location}
-                                </div>
-                                <div className="text-amber-400 font-mono text-xs opacity-90">
-                                    {time.toLocaleTimeString('id-ID', { hour12: false })}
-                                </div>
-                            </div>
-
-                            {/* RTSP Debug Info (Hover Only) */}
+                {window.location.hostname.includes('vercel.app') ? (
+                    <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-8 text-center flex flex-col items-center justify-center h-full">
+                        <Video size={64} className="text-rose-500 mb-4 opacity-80" />
+                        <h2 className="text-xl font-bold text-rose-400 mb-2">Live Stream Tidak Tersedia di Cloud (Vercel)</h2>
+                        <p className="text-slate-300 max-w-2xl text-sm leading-relaxed">
+                            Aliran video CCTV ini diproses secara lokal di server sekolah (Laptop Anda) menggunakan <strong>MediaMTX</strong>. Karena alasan keamanan browser <em>(Mixed Content Policy)</em>, website Vercel (HTTPS) tidak diizinkan memutar video lokal (HTTP) Anda secara langsung di internet.
+                        </p>
+                        <div className="mt-6 bg-[#0f172a] p-4 rounded-lg border border-slate-700 inline-block text-left">
+                            <p className="text-emerald-400 font-bold text-sm mb-2">💡 Solusi Untuk HP:</p>
+                            <ol className="text-slate-400 text-sm list-decimal ml-4 space-y-1">
+                                <li>Pastikan HP Anda terhubung ke <strong>WiFi yang sama</strong> dengan Laptop.</li>
+                                <li>Buka terminal Laptop, ketik <code className="bg-slate-800 text-emerald-300 px-1 rounded">ipconfig</code> untuk melihat IPv4 Address.</li>
+                                <li>Di browser HP, buka: <strong className="text-white">http://[IPv4-Laptop-Anda]:5173</strong></li>
+                            </ol>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                        {cameras.map((camera) => (
                             <div 
-                                className="absolute inset-0 bg-emerald-900/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-center items-center text-center p-4"
-                                onClick={() => setSelectedCamera(camera)}
+                                key={camera.id} 
+                                className="bg-black rounded-xl overflow-hidden relative group border border-slate-800 shadow-xl min-h-[220px] cursor-crosshair"
                             >
-                                <Maximize2 className="text-white mb-2" size={32} />
-                                <span className="text-white font-bold text-sm">Klik untuk Perbesar Layar</span>
-                                <span className="text-emerald-300 text-[10px] mt-2 border border-emerald-400/30 px-2 py-1 rounded break-all shadow-sm">
-                                    {camera.rtsp_url}
-                                </span>
+                                {/* LIVE WEBRTC STREAM FROM MEDIAMTX */}
+                                <div className="absolute inset-0 bg-slate-900 animate-pulse -z-10"></div>
+                                <iframe 
+                                    src={`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:8889/${camera.mtxPath}/`} 
+                                    title={camera.name}
+                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition duration-700 contrast-125 scale-105"
+                                    frameBorder="0"
+                                    scrolling="no"
+                                    allow="autoplay; fullscreen"
+                                    style={{ pointerEvents: 'none' }}
+                                ></iframe>
+
+                                {/* Efek Scanline Buatan dengan CSS */}
+                                <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px] pointer-events-none opacity-50 mix-blend-overlay"></div>
+
+                                {/* Overlay Top: Status & Name */}
+                                <div className="absolute top-0 left-0 w-full p-3 bg-gradient-to-b from-black/80 to-transparent pointer-events-none flex justify-between items-start">
+                                    <div className="flex gap-2 items-center">
+                                        <div className="w-2.5 h-2.5 bg-red-600 rounded-full animate-ping shadow-[0_0_8px_rgba(220,38,38,0.8)]"></div>
+                                        <span className="text-white text-xs font-mono font-bold tracking-wider">{camera.name}</span>
+                                    </div>
+                                    <div className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg">LIVE</div>
+                                </div>
+
+                                {/* Overlay Bottom: Location & Timestamp */}
+                                <div className="absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/90 to-transparent pointer-events-none flex justify-between items-end">
+                                    <div className="text-emerald-400 font-mono text-xs flex items-center gap-1.5 opacity-90">
+                                        <MapPin size={12} /> {camera.location}
+                                    </div>
+                                    <div className="text-amber-400 font-mono text-xs opacity-90">
+                                        {time.toLocaleTimeString('id-ID', { hour12: false })}
+                                    </div>
+                                </div>
+
+                                {/* RTSP Debug Info (Hover Only) */}
+                                <div 
+                                    className="absolute inset-0 bg-emerald-900/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-center items-center text-center p-4"
+                                    onClick={() => setSelectedCamera(camera)}
+                                >
+                                    <Maximize2 className="text-white mb-2" size={32} />
+                                    <span className="text-white font-bold text-sm">Klik untuk Perbesar Layar</span>
+                                    <span className="text-emerald-300 text-[10px] mt-2 border border-emerald-400/30 px-2 py-1 rounded break-all shadow-sm">
+                                        {camera.rtsp_url}
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                    
-                    {cameras.length === 0 && (
-                        <div className="col-span-full h-64 flex flex-col items-center justify-center text-slate-500 bg-[#0f172a] rounded-xl border border-dashed border-slate-700 ring-1 ring-white/5">
-                            <Video size={48} className="mb-4 text-slate-600" />
-                            <p>Tidak ada data kamera ditemukan.</p>
-                        </div>
-                    )}
-                </div>
+                        ))}
+                        
+                        {cameras.length === 0 && (
+                            <div className="col-span-full h-64 flex flex-col items-center justify-center text-slate-500 bg-[#0f172a] rounded-xl border border-dashed border-slate-700 ring-1 ring-white/5">
+                                <Video size={48} className="mb-4 text-slate-600" />
+                                <p>Tidak ada data kamera ditemukan.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* FULLSCREEN CAMERA MODAL WITH DVR TIMELINE MOCKUP */}
@@ -163,7 +181,7 @@ export default function LiveMonitoring() {
                     {/* Large Video Area (Full 16:9 Aspect Ratio) */}
                     <div className="w-full max-w-5xl aspect-video bg-black rounded-lg overflow-hidden border border-slate-700 relative shadow-2xl ring-4 ring-black/50 pointer-events-none">
                         <iframe 
-                            src={`http://127.0.0.1:8889/${selectedCamera.mtxPath}/`} 
+                            src={`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:8889/${selectedCamera.mtxPath}/`} 
                             title={selectedCamera.name}
                             className="w-full h-full object-cover scale-105"
                             frameBorder="0"
