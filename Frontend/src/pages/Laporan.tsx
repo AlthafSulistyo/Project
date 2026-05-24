@@ -185,7 +185,7 @@ export default function Laporan() {
     }, [filterType, startDate, endDate, searchTerm]);
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
 
             {/* HEADER */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
