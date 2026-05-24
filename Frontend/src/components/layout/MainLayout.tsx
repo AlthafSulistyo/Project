@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Video, FileText, Settings, Bell, Menu, LogOut, X, Check, Shield } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import axios from 'axios';
+import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 const MainLayout = () => {
   const location = useLocation();
@@ -37,42 +38,35 @@ const MainLayout = () => {
   };
 
   // Download Evidence/Screenshot Handler
-  const handleDownloadEvidence = async (event: any) => {
-    try {
-      const imageUrl = `http://${window.location.hostname}:8000/${event.snapshot_path}`;
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `CCTV_Evidence_${event.id}_${new Date(event.created_at).toISOString().replace(/:/g, '-')}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Failed to download evidence:', error);
-      alert('Gagal mendownload bukti. Silakan coba lagi.');
+  const handleDownloadEvidence = (event: any) => {
+    if (event.snapshot_url) {
+      window.open(event.snapshot_url, '_blank');
+    } else {
+      alert('Gagal mendownload bukti. Gambar tidak tersedia.');
     }
   };
 
-  // Fetch unreviewed events for notifications
+  // Fetch unreviewed events for notifications (FIREBASE)
   useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const response = await axios.get(`http://${window.location.hostname}:8000/api/cctv-events`);
-        const events = response.data.data;
-        const unreviewed = events.filter((e: any) => !e.is_reviewed).slice(0, 10);
-        setNotifications(unreviewed);
-        setUnreadCount(unreviewed.length);
-      } catch (error) {
-        console.error('Failed to fetch notifications:', error);
-      }
-    };
-    fetchNotifications();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    const q = query(
+      collection(db, 'cctv_events'),
+      where('status', '==', 'unreviewed'),
+      orderBy('timestamp', 'desc'),
+      limit(10)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unreviewed: any[] = [];
+      snapshot.forEach((doc) => {
+        unreviewed.push({ id: doc.id, ...doc.data() });
+      });
+      setNotifications(unreviewed);
+      setUnreadCount(unreviewed.length);
+    }, (error) => {
+      console.error('Failed to fetch notifications from Firebase:', error);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const isActive = (path: string) => {
@@ -253,15 +247,15 @@ const MainLayout = () => {
                                 }`}></div>
                               <div className="flex-1">
                                 <p className="text-sm font-medium text-slate-200 mb-1">
-                                  {notif.event_type.replace(/_/g, ' ').toUpperCase()}
+                                  {notif.category || notif.event_type || 'AKTIVITAS'}
                                 </p>
                                 <p className="text-xs text-slate-400 mb-2">
-                                  {notif.description}
+                                  {notif.message || notif.description}
                                 </p>
                                 <div className="flex items-center gap-2 text-xs text-slate-500">
                                   <span>📹 {notif.camera_name}</span>
                                   <span>•</span>
-                                  <span>{new Date(notif.created_at).toLocaleString('id-ID')}</span>
+                                  <span>{notif.timestamp?.toDate ? notif.timestamp.toDate().toLocaleString('id-ID') : new Date(notif.created_at || Date.now()).toLocaleString('id-ID')}</span>
                                   <span>•</span>
                                   <span className="text-emerald-400 group-hover:underline font-medium">📸 Lihat Bukti</span>
                                 </div>
@@ -314,7 +308,7 @@ const MainLayout = () => {
               <div>
                 <h2 className="text-xl font-bold text-slate-100 mb-1">Bukti Kejadian CCTV</h2>
                 <p className="text-sm text-slate-400">
-                  ID Kejadian: #{selectedEvent.id} • {new Date(selectedEvent.created_at).toLocaleString('id-ID')}
+                  ID Kejadian: #{selectedEvent.id} • {selectedEvent.timestamp?.toDate ? selectedEvent.timestamp.toDate().toLocaleString('id-ID') : new Date(selectedEvent.created_at || Date.now()).toLocaleString('id-ID')}
                 </p>
               </div>
               <button
@@ -336,13 +330,13 @@ const MainLayout = () => {
                   <div className="bg-slate-950 rounded-lg overflow-hidden aspect-video relative border border-slate-800">
                     {/* Actual CCTV Screenshot */}
                     <img
-                      src={`http://${window.location.hostname}:8000/${selectedEvent.snapshot_path}`}
+                      src={selectedEvent.snapshot_url || '/placeholder.jpg'}
                       alt="CCTV Evidence"
                       className="w-full h-full object-cover opacity-90"
                     />
                     {/* Timestamp Overlay */}
                     <div className="absolute top-3 left-3 bg-slate-950/80 px-3 py-1 rounded text-white text-xs font-mono border border-slate-800">
-                      {new Date(selectedEvent.created_at).toLocaleString('id-ID')}
+                      {selectedEvent.timestamp?.toDate ? selectedEvent.timestamp.toDate().toLocaleString('id-ID') : new Date(selectedEvent.created_at || Date.now()).toLocaleString('id-ID')}
                     </div>
                     {/* Camera Name Overlay */}
                     <div className="absolute top-3 right-3 bg-rose-500/90 px-3 py-1 rounded text-white text-xs font-bold flex items-center gap-1 shadow-lg shadow-rose-500/20 border border-rose-500/50">
@@ -375,13 +369,13 @@ const MainLayout = () => {
                       <div>
                         <label className="text-xs text-slate-500 font-medium">Jenis Kejadian</label>
                         <p className="text-sm font-bold text-slate-200">
-                          {selectedEvent.event_type.replace(/_/g, ' ').toUpperCase()}
+                          {selectedEvent.category || selectedEvent.event_type || 'AKTIVITAS'}
                         </p>
                       </div>
 
                       <div>
                         <label className="text-xs text-slate-500 font-medium">Deskripsi</label>
-                        <p className="text-sm text-slate-400">{selectedEvent.description}</p>
+                        <p className="text-sm text-slate-400">{selectedEvent.message || selectedEvent.description}</p>
                       </div>
 
                       <div>
@@ -431,7 +425,17 @@ const MainLayout = () => {
                     >
                       Lihat di Laporan
                     </button>
-                    <button className="flex-1 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition font-medium text-sm shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]">
+                    <button onClick={async () => {
+                      try {
+                        await updateDoc(doc(db, 'cctv_events', selectedEvent.id), {
+                          status: 'reviewed',
+                          is_reviewed: true
+                        });
+                        setShowEvidenceModal(false);
+                      } catch (e) {
+                        console.error('Gagal update status:', e);
+                      }
+                    }} className="flex-1 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition font-medium text-sm shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]">
                       Tandai Selesai
                     </button>
                   </div>

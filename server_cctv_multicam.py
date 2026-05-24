@@ -88,24 +88,22 @@ def send_firebase_alert(camera_name, category, severity, message, active_count, 
     event_id = str(uuid.uuid4())
     image_url = None
     
-    # 1. Simpan Gambar secara Lokal ke folder React
+    # 1. Simpan Gambar ke Firebase Storage
     if frame is not None:
         try:
-            import os
-            save_dir = r"C:\Users\Althaf\Documents\KULIAH\Tugas Akhir\Project\Frontend\public\snapshots"
-            os.makedirs(save_dir, exist_ok=True)
+            # Convert frame to jpg in memory (kompresi 60%)
+            _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
             
-            filename = f"{event_id}.jpg"
-            save_path = os.path.join(save_dir, filename)
+            # Upload ke Firebase Storage
+            blob = bucket.blob(f"snapshots/{event_id}.jpg")
+            blob.upload_from_string(buffer.tobytes(), content_type='image/jpeg')
             
-            # Simpan dengan kompresi 60%
-            cv2.imwrite(save_path, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
-            
-            # Path URL untuk React Frontend (dari folder public)
-            image_url = f"/snapshots/{filename}"
+            # Buat URL public yang langsung bisa diakses Vercel
+            blob.make_public()
+            image_url = blob.public_url
             
         except Exception as e:
-            logging.error(f"Gagal simpan frame lokal: {e}")
+            logging.error(f"Gagal upload frame ke Firebase Storage: {e}")
 
     # 2. Simpan Data ke Firestore
     payload = {
@@ -122,8 +120,41 @@ def send_firebase_alert(camera_name, category, severity, message, active_count, 
     try:
         db.collection('cctv_events').document(event_id).set(payload)
         logging.info(f"Firebase Firestore Alert [{camera_name}]: {severity} - {message}")
+        
+        # 3. Jalankan Auto-Cleanup (Menghapus log yang lebih dari 500 kejadian)
+        cleanup_old_snapshots()
     except Exception as e:
         logging.error(f"Gagal kirim log ke Firestore [{camera_name}]: {e}")
+
+def cleanup_old_snapshots():
+    try:
+        # Ambil semua data kejadian diurutkan dari yang terbaru
+        events_ref = db.collection('cctv_events').order_by('timestamp', direction=firestore.Query.DESCENDING).get()
+        MAX_EVENTS = 500
+        
+        if len(events_ref) > MAX_EVENTS:
+            # Ambil sisa data yang melampaui batas 500
+            events_to_delete = events_ref[MAX_EVENTS:]
+            logging.info(f"Menjalankan auto-cleanup: menghapus {len(events_to_delete)} log lama...")
+            
+            for doc in events_to_delete:
+                data = doc.to_dict()
+                
+                # Hapus gambar dari Firebase Storage jika ada
+                if 'snapshot_url' in data and data['snapshot_url'] and 'storage.googleapis.com' in data['snapshot_url']:
+                    try:
+                        # Asumsikan nama file sama dengan ID dokumen
+                        blob = bucket.blob(f"snapshots/{doc.id}.jpg")
+                        blob.delete()
+                    except Exception as e:
+                        pass # Abaikan jika gambar tidak ditemukan
+                
+                # Hapus dokumen dari Firestore
+                db.collection('cctv_events').document(doc.id).delete()
+                
+            logging.info("Auto-cleanup selesai!")
+    except Exception as e:
+        logging.error(f"Error saat menjalankan auto-cleanup: {e}")
 
 def main():
     logging.info("=== SCHOOL GUARD MULTICAM SERVER (FIREBASE) ===")
