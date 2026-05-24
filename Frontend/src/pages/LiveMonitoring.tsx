@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Maximize2, Disc, Video, MapPin, Activity } from 'lucide-react';
+import { Maximize2, Disc, Video, MapPin, Activity, Settings } from 'lucide-react';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -18,8 +18,42 @@ export default function LiveMonitoring() {
     const [time, setTime] = useState(new Date());
     const [selectedCamera, setSelectedCamera] = useState<Camera | null>(null);
     const gridContainerRef = useRef<HTMLDivElement>(null);
+    
+    // Global Stream URL from Firebase
+    const [streamServerUrl, setStreamServerUrl] = useState(`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:8889`);
+    const [showConfigModal, setShowConfigModal] = useState(false);
+    const [tempUrl, setTempUrl] = useState(streamServerUrl);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const saveConfig = async () => {
+        setIsSaving(true);
+        let cleanUrl = tempUrl.trim();
+        if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
+        
+        try {
+            const { doc, setDoc } = await import('firebase/firestore');
+            await setDoc(doc(db, 'settings', 'system'), { streamServerUrl: cleanUrl }, { merge: true });
+            setShowConfigModal(false);
+        } catch (error) {
+            console.error("Gagal menyimpan konfigurasi URL:", error);
+            alert("Gagal menyimpan ke Firebase. Pastikan koneksi internet lancar.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     useEffect(() => {
+        // Subscribe to system settings for global Stream URL
+        import('firebase/firestore').then(({ doc, onSnapshot: onDocSnapshot }) => {
+            const unsubSettings = onDocSnapshot(doc(db, 'settings', 'system'), (docSnap) => {
+                if (docSnap.exists() && docSnap.data().streamServerUrl) {
+                    setStreamServerUrl(docSnap.data().streamServerUrl);
+                }
+            });
+            // Attach to window so we can cleanup, or just let it live for the session
+        });
+
+        // Subscribe to cameras
         const qCameras = query(collection(db, 'cameras'), where('status', '==', 'active'));
         
         const unsubscribe = onSnapshot(qCameras, (snapshot) => {
@@ -72,6 +106,9 @@ export default function LiveMonitoring() {
                     </p>
                 </div>
                 <div className="flex gap-3">
+                    <button onClick={() => { setTempUrl(streamServerUrl); setShowConfigModal(true); }} className="bg-[#1e293b] text-slate-300 hover:text-white px-3 py-2 rounded-lg flex items-center shadow-inner border border-slate-700/50 hover:bg-slate-700 transition" title="Pengaturan Server Video">
+                        <Settings size={18} />
+                    </button>
                     <div className="bg-[#1e293b] text-slate-200 px-4 py-2 font-mono text-sm rounded-lg flex items-center shadow-inner font-bold border border-slate-700/50">
                         {time.toLocaleTimeString('id-ID')}
                     </div>
@@ -80,20 +117,36 @@ export default function LiveMonitoring() {
 
             {/* GRID KAMERA (Responsive) */}
             <div className="flex-1 overflow-y-auto pr-2 pb-8 custom-scrollbar">
-                {window.location.hostname.includes('vercel.app') ? (
+                {(window.location.hostname.includes('vercel.app') && streamServerUrl.includes('127.0.0.1')) ? (
                     <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-8 text-center flex flex-col items-center justify-center h-full">
                         <Video size={64} className="text-rose-500 mb-4 opacity-80" />
-                        <h2 className="text-xl font-bold text-rose-400 mb-2">Live Stream Tidak Tersedia di Cloud (Vercel)</h2>
-                        <p className="text-slate-300 max-w-2xl text-sm leading-relaxed">
-                            Aliran video CCTV ini diproses secara lokal di server sekolah (Laptop Anda) menggunakan <strong>MediaMTX</strong>. Karena alasan keamanan browser <em>(Mixed Content Policy)</em>, website Vercel (HTTPS) tidak diizinkan memutar video lokal (HTTP) Anda secara langsung di internet.
+                        <h2 className="text-xl font-bold text-rose-400 mb-2">Live Stream Terblokir (Mode Cloud)</h2>
+                        <p className="text-slate-300 max-w-2xl text-sm leading-relaxed mb-6">
+                            Karena alasan keamanan browser <em>(Mixed Content)</em>, website Vercel tidak diizinkan memutar video dari <strong className="text-rose-400">127.0.0.1 (Localhost)</strong>.
                         </p>
-                        <div className="mt-6 bg-[#0f172a] p-4 rounded-lg border border-slate-700 inline-block text-left">
-                            <p className="text-emerald-400 font-bold text-sm mb-2">💡 Solusi Untuk HP:</p>
-                            <ol className="text-slate-400 text-sm list-decimal ml-4 space-y-1">
-                                <li>Pastikan HP Anda terhubung ke <strong>WiFi yang sama</strong> dengan Laptop.</li>
-                                <li>Buka terminal Laptop, ketik <code className="bg-slate-800 text-emerald-300 px-1 rounded">ipconfig</code> untuk melihat IPv4 Address.</li>
-                                <li>Di browser HP, buka: <strong className="text-white">http://[IPv4-Laptop-Anda]:5173</strong></li>
-                            </ol>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left w-full max-w-3xl">
+                            <div className="bg-[#0f172a] p-5 rounded-xl border border-emerald-500/30">
+                                <h3 className="text-emerald-400 font-bold mb-2 flex items-center gap-2"><Activity size={18}/> Opsi 1: Jaringan Lokal (WiFi Sama)</h3>
+                                <p className="text-slate-400 text-xs mb-3">Sangat disarankan untuk presentasi sidang.</p>
+                                <ol className="text-slate-300 text-sm list-decimal ml-4 space-y-1">
+                                    <li>Sambungkan HP ke WiFi/Hotspot Laptop.</li>
+                                    <li>Ketik <code className="bg-slate-800 text-emerald-300 px-1 rounded">ipconfig</code> di terminal Laptop.</li>
+                                    <li>Buka di HP: <strong>http://[IP-Laptop]:5173</strong></li>
+                                </ol>
+                            </div>
+                            <div className="bg-[#0f172a] p-5 rounded-xl border border-blue-500/30">
+                                <h3 className="text-blue-400 font-bold mb-2 flex items-center gap-2"><Disc size={18}/> Opsi 2: Remote Jarak Jauh (Ngrok/Cloudflare)</h3>
+                                <p className="text-slate-400 text-xs mb-3">Akses dari manapun via internet publik.</p>
+                                <ol className="text-slate-300 text-sm list-decimal ml-4 space-y-1 mb-4">
+                                    <li>Install & Jalankan Tunneling (misal Cloudflare).</li>
+                                    <li>Arahkan tunnel ke port <strong>8889</strong>.</li>
+                                    <li>Dapatkan URL Publik HTTPS.</li>
+                                </ol>
+                                <button onClick={() => setShowConfigModal(true)} className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-bold transition shadow-lg shadow-blue-500/20">
+                                    Masukkan URL Public Tunnel
+                                </button>
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -106,7 +159,7 @@ export default function LiveMonitoring() {
                                 {/* LIVE WEBRTC STREAM FROM MEDIAMTX */}
                                 <div className="absolute inset-0 bg-slate-900 animate-pulse -z-10"></div>
                                 <iframe 
-                                    src={`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:8889/${camera.mtxPath}/`} 
+                                    src={`${streamServerUrl}/${camera.mtxPath}/`} 
                                     title={camera.name}
                                     className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition duration-700 contrast-125 scale-105"
                                     frameBorder="0"
@@ -181,7 +234,7 @@ export default function LiveMonitoring() {
                     {/* Large Video Area (Full 16:9 Aspect Ratio) */}
                     <div className="w-full max-w-5xl aspect-video bg-black rounded-lg overflow-hidden border border-slate-700 relative shadow-2xl ring-4 ring-black/50 pointer-events-none">
                         <iframe 
-                            src={`http://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:8889/${selectedCamera.mtxPath}/`} 
+                            src={`${streamServerUrl}/${selectedCamera.mtxPath}/`} 
                             title={selectedCamera.name}
                             className="w-full h-full object-cover scale-105"
                             frameBorder="0"
@@ -236,6 +289,36 @@ export default function LiveMonitoring() {
                         
                         <div className="text-center">
                             <span className="text-xs text-slate-500 font-medium">⚠️ Catatan SIstem: Modul Playback Terbatas. Perangkat Kamera CCTV tidak dilengkapi unit memori penyimpan (SD Card).</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CONFIG MODAL */}
+            {showConfigModal && (
+                <div className="fixed inset-0 bg-slate-900/90 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-[#0f172a] border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+                        <div className="bg-slate-800/50 p-4 border-b border-slate-700 flex justify-between items-center">
+                            <h3 className="font-bold text-white flex items-center gap-2"><Settings size={18}/> Pengaturan Server Stream</h3>
+                            <button onClick={() => setShowConfigModal(false)} className="text-slate-400 hover:text-white">×</button>
+                        </div>
+                        <div className="p-6">
+                            <label className="block text-sm text-slate-400 mb-2">MediaMTX URL (Local / Ngrok / Cloudflare)</label>
+                            <input 
+                                type="text" 
+                                value={tempUrl}
+                                onChange={(e) => setTempUrl(e.target.value)}
+                                placeholder="Contoh: https://abcd.ngrok.app"
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 font-mono text-sm mb-4"
+                            />
+                            <div className="text-xs text-slate-500 mb-6 space-y-1">
+                                <p>• Default Lokal: <code className="text-slate-400">http://127.0.0.1:8889</code></p>
+                                <p>• Jika pakai Ngrok, jangan lupa sertakan <code className="text-slate-400">https://</code></p>
+                            </div>
+                            <div className="flex gap-3 justify-end">
+                                <button onClick={() => setShowConfigModal(false)} className="px-4 py-2 rounded-lg font-bold text-slate-400 hover:text-white transition">Batal</button>
+                                <button onClick={saveConfig} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition shadow-lg">Simpan URL</button>
+                            </div>
                         </div>
                     </div>
                 </div>
