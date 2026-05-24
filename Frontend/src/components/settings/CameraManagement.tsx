@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Video, Plus, Edit2, Trash2, X, Save, Loader2 } from 'lucide-react';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../../firebase';
+import { Video, Plus, Edit2, Trash2, X, Save, Loader2, ShieldAlert } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 interface Camera {
-    id: number;
+    id: string;
     name: string;
     location: string;
     rtsp_url: string;
@@ -11,6 +13,7 @@ interface Camera {
 }
 
 export default function CameraManagement() {
+    const { isAdmin } = useAuth();
     const [cameras, setCameras] = useState<Camera[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -22,7 +25,7 @@ export default function CameraManagement() {
         status: 'active' as 'active' | 'inactive'
     });
     const [saving, setSaving] = useState(false);
-    const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
     useEffect(() => {
         fetchCameras();
@@ -30,8 +33,12 @@ export default function CameraManagement() {
 
     const fetchCameras = async () => {
         try {
-            const response = await axios.get(`http://127.0.0.1:8000/api/cameras`);
-            setCameras(response.data.data);
+            const querySnapshot = await getDocs(collection(db, 'cameras'));
+            const data: Camera[] = [];
+            querySnapshot.forEach((doc) => {
+                data.push({ id: doc.id, ...doc.data() } as Camera);
+            });
+            setCameras(data);
             setLoading(false);
         } catch (error) {
             console.error('Failed to fetch cameras:', error);
@@ -61,10 +68,11 @@ export default function CameraManagement() {
         try {
             if (editingCamera) {
                 // Update existing camera
-                await axios.put(`http://127.0.0.1:8000/api/cameras/${editingCamera.id}`, formData);
+                const camRef = doc(db, 'cameras', editingCamera.id);
+                await updateDoc(camRef, formData);
             } else {
                 // Create new camera
-                await axios.post(`http://127.0.0.1:8000/api/cameras`, formData);
+                await addDoc(collection(db, 'cameras'), formData);
             }
             await fetchCameras();
             setShowModal(false);
@@ -77,9 +85,9 @@ export default function CameraManagement() {
         }
     };
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (id: string) => {
         try {
-            await axios.delete(`http://127.0.0.1:8000/api/cameras/${id}`);
+            await deleteDoc(doc(db, 'cameras', id));
             await fetchCameras();
             setDeleteConfirm(null);
         } catch (error) {
@@ -104,12 +112,18 @@ export default function CameraManagement() {
                     <h3 className="font-bold text-slate-100">Daftar Kamera CCTV</h3>
                     <p className="text-xs text-slate-400">Kelola kamera yang terhubung ke sistem</p>
                 </div>
-                <button
-                    onClick={handleAdd}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 font-medium text-sm transition shadow-lg shadow-emerald-500/20"
-                >
-                    <Plus size={18} /> Tambah Kamera
-                </button>
+                {isAdmin() ? (
+                    <button
+                        onClick={handleAdd}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 font-medium text-sm transition shadow-lg shadow-emerald-500/20"
+                    >
+                        <Plus size={18} /> Tambah Kamera
+                    </button>
+                ) : (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 text-slate-400 rounded-lg border border-slate-700/50 text-xs font-medium">
+                        <ShieldAlert size={14} /> Hanya Admin
+                    </div>
+                )}
             </div>
 
             {/* Table */}
@@ -121,7 +135,7 @@ export default function CameraManagement() {
                             <th className="px-4 py-3 text-left">Lokasi</th>
                             <th className="px-4 py-3 text-left">RTSP URL</th>
                             <th className="px-4 py-3 text-center">Status</th>
-                            <th className="px-4 py-3 text-center">Aksi</th>
+                            {isAdmin() && <th className="px-4 py-3 text-center">Aksi</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/50">
@@ -143,24 +157,26 @@ export default function CameraManagement() {
                                         </span>
                                     )}
                                 </td>
-                                <td className="px-4 py-3">
-                                    <div className="flex items-center justify-center gap-2">
-                                        <button
-                                            onClick={() => handleEdit(camera)}
-                                            className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition"
-                                            title="Edit"
-                                        >
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => setDeleteConfirm(camera.id)}
-                                            className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded transition"
-                                            title="Hapus"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </td>
+                                {isAdmin() && (
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <button
+                                                onClick={() => handleEdit(camera)}
+                                                className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition"
+                                                title="Edit"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => setDeleteConfirm(camera.id)}
+                                                className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded transition"
+                                                title="Hapus"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                )}
                             </tr>
                         ))}
                         {cameras.length === 0 && (

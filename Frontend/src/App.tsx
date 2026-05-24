@@ -7,6 +7,8 @@ import Dashboard from './pages/Dashboard';
 import LiveMonitoring from './pages/LiveMonitoring';
 import Laporan from './pages/Laporan';
 import Settings from './pages/Settings';
+import GlobalNotification from './components/GlobalNotification';
+import { Toaster } from 'sonner';
 
 function App() {
   return (
@@ -17,7 +19,11 @@ function App() {
           <Route path="/login" element={<Login />} />
 
           {/* Protected Routes */}
-          <Route path="/" element={<MainLayout />}>
+          <Route path="/" element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }>
             <Route index element={<Dashboard />} />
             <Route path="live" element={<LiveMonitoring />} />
             <Route path="laporan" element={<Laporan />} />
@@ -27,6 +33,8 @@ function App() {
           {/* Redirect any unknown routes to root */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <GlobalNotification />
+        <Toaster richColors />
       </BrowserRouter>
     </AuthProvider>
   );

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 import { Save, AlertTriangle, Activity, MapPin, Eye, CheckCircle2 } from 'lucide-react';
 
 interface SeverityMapping {
@@ -26,8 +27,20 @@ export default function EventSeverityManagement() {
 
   const fetchMapping = async () => {
     try {
-      const response = await axios.get(`http://127.0.0.1:8000/api/settings/severity-mapping`);
-      setMapping(response.data.data || {});
+      const docRef = doc(db, 'settings', 'severity_mapping');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setMapping(docSnap.data().mapping || {});
+      } else {
+        // Fallback default
+        setMapping({
+          motion_detected: 'medium',
+          line_crossed: 'medium',
+          intrusion: 'high',
+          loitering: 'low',
+          parking: 'medium'
+        });
+      }
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch severity mapping:', error);
@@ -45,9 +58,9 @@ export default function EventSeverityManagement() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await axios.post(`http://127.0.0.1:8000/api/settings/severity-mapping`, {
-        mapping
-      });
+      const docRef = doc(db, 'settings', 'severity_mapping');
+      await setDoc(docRef, { mapping }, { merge: true });
+      
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {

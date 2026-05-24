@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Maximize2, Disc, Video, MapPin, Activity } from 'lucide-react';
-import axios from 'axios';
+import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface Camera {
     id: number;
@@ -19,36 +20,39 @@ export default function LiveMonitoring() {
     const gridContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const fetchCameras = async () => {
-            try {
-                const res = await axios.get(`http://127.0.0.1:8000/api/cameras`);
-                const allCameras = res.data.data || [];
-                
-                // Map the correct MediaMTX path (cam_1 to cam_15) based on the original database order
-                const mappedCameras = allCameras.map((cam: Camera, index: number) => ({
-                    ...cam,
+        const qCameras = query(collection(db, 'cameras'), where('status', '==', 'active'));
+        
+        const unsubscribe = onSnapshot(qCameras, (snapshot) => {
+            const allCameras: Camera[] = [];
+            let index = 0;
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                allCameras.push({
+                    id: doc.id as any, // Cast to any as id was previously number
+                    name: data.name || `Camera ${index + 1}`,
+                    location: data.location || 'Unknown',
+                    status: data.status || 'active',
+                    rtsp_url: data.rtsp_url || '',
                     mtxPath: `cam_${index + 1}`
-                }));
-
-                // Hanya tampilkan kamera yang statusnya aktif
-                const filteredCameras = mappedCameras.filter((cam: Camera) => cam.status === 'active');
-
-                setCameras(filteredCameras);
-            } catch (error) {
-                console.error("Gagal koneksi ke Backend:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchCameras();
+                });
+                index++;
+            });
+            setCameras(allCameras);
+            setLoading(false);
+        }, (error) => {
+            console.error("Gagal koneksi ke Firebase:", error);
+            setLoading(false);
+        });
 
         // Update jam setiap detik
         const interval = setInterval(() => {
             setTime(new Date());
         }, 1000);
 
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            unsubscribe();
+        };
     }, []);
 
     if (loading) {

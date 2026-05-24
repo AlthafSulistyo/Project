@@ -3,8 +3,9 @@ import numpy as np
 import time
 import threading
 import logging
-import requests
-import base64
+import uuid
+import firebase_admin
+from firebase_admin import credentials, firestore, storage
 from datetime import datetime, time as dt_time
 from ultralytics import YOLO
 
@@ -18,9 +19,18 @@ logging.basicConfig(
     ]
 )
 
-# API Endpoint Backend
-API_BASE = "http://127.0.0.1:8000/api"
-WEBHOOK_URL = f"{API_BASE}/webhooks/cctv-ai"
+logging.info("Memulai inisialisasi Firebase Admin SDK...")
+try:
+    cred = credentials.Certificate("schoolguard-648f4-firebase-adminsdk-fbsvc-e2ad46af2e.json")
+    firebase_admin.initialize_app(cred, {
+        'storageBucket': 'schoolguard-648f4.firebasestorage.app'
+    })
+    db = firestore.client()
+    bucket = storage.bucket()
+    logging.info("Berhasil terhubung ke Firebase Firestore & Storage!")
+except Exception as e:
+    logging.error(f"Gagal menghubungkan Firebase: {e}")
+    exit(1)
 
 class CameraStream:
     def __init__(self, name, rtsp_url):
@@ -74,63 +84,72 @@ class CameraStream:
         if self.cap:
             self.cap.release()
 
-def send_webhook(camera_name, category, severity, message, active_count, frame):
+def send_firebase_alert(camera_name, category, severity, message, active_count, frame):
+    event_id = str(uuid.uuid4())
+    image_url = None
+    
+    # 1. Simpan Gambar secara Lokal ke folder React
+    if frame is not None:
+        try:
+            import os
+            save_dir = r"C:\Users\Althaf\Documents\KULIAH\Tugas Akhir\Project\Frontend\public\snapshots"
+            os.makedirs(save_dir, exist_ok=True)
+            
+            filename = f"{event_id}.jpg"
+            save_path = os.path.join(save_dir, filename)
+            
+            # Simpan dengan kompresi 60%
+            cv2.imwrite(save_path, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
+            
+            # Path URL untuk React Frontend (dari folder public)
+            image_url = f"/snapshots/{filename}"
+            
+        except Exception as e:
+            logging.error(f"Gagal simpan frame lokal: {e}")
+
+    # 2. Simpan Data ke Firestore
     payload = {
         "camera_name": camera_name,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(), # Firestore akan mengkonversi ini ke Timestamp type
         "category": category,
         "severity": severity,
         "message": message,
-        "active_persons": active_count
+        "active_persons": active_count,
+        "snapshot_url": image_url,
+        "status": "unreviewed"
     }
-    
-    if frame is not None:
-        try:
-            _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
-            payload["snapshot_base64"] = base64.b64encode(buffer).decode('utf-8')
-        except Exception as e:
-            logging.error(f"Gagal compress frame: {e}")
 
     try:
-        requests.post(WEBHOOK_URL, json=payload, timeout=2)
-        logging.info(f"Webhook [{camera_name}]: {severity} - {message}")
+        db.collection('cctv_events').document(event_id).set(payload)
+        logging.info(f"Firebase Firestore Alert [{camera_name}]: {severity} - {message}")
     except Exception as e:
-        logging.error(f"Gagal kirim webhook [{camera_name}]: {e}")
+        logging.error(f"Gagal kirim log ke Firestore [{camera_name}]: {e}")
 
 def main():
-    logging.info("=== SCHOOL GUARD MULTICAM SERVER ===")
+    logging.info("=== SCHOOL GUARD MULTICAM SERVER (FIREBASE) ===")
     
-    # 1. Fetch Daftar Kamera dari Database Backend
-    logging.info("Mengambil daftar kamera dari Backend...")
+    # 1. Fetch Daftar Kamera dari Firebase Firestore
+    logging.info("Mengambil daftar kamera dari Firestore...")
     cameras_data = []
-    for attempt in range(12):  # Coba terus selama 60 detik (12 x 5s)
-        try:
-            res = requests.get(f"{API_BASE}/cameras", timeout=5)
-            if res.status_code != 200:
-                logging.warning(f"Backend membalas dengan status {res.status_code}. Text: {res.text[:100]}")
-                time.sleep(5)
-                continue
-                
-            data = res.json()
-            cameras_data = data.get('data', [])
-            if cameras_data:
-                break
-            else:
-                logging.warning("Backend siap, tapi belum ada kamera di database. Coba lagi...")
-                time.sleep(5)
-        except Exception as e:
-            logging.warning(f"Backend belum siap, mencoba lagi dalam 5 detik... ({e})")
-            time.sleep(5)
+    
+    try:
+        cam_ref = db.collection('cameras').where('status', '==', 'active').get()
+        for doc in cam_ref:
+            c = doc.to_dict()
+            if 'rtsp_url' in c and 'name' in c:
+                cameras_data.append(c)
+    except Exception as e:
+        logging.error(f"Gagal membaca collection 'cameras' dari Firestore: {e}")
 
     if not cameras_data:
-        logging.error("Gagal terhubung ke database / Tidak ada kamera terdaftar! Pastikan Backend menyala.")
-        return
+        logging.warning("Tidak ada kamera ditemukan di Firestore. Menggunakan Dummy RTSP sebagai fallback.")
+        # Fallback dummy camera if no cameras found in new Firebase DB
+        cameras_data = [{"name": "Kamera Demo 1", "rtsp_url": "rtsp://demo:demo@192.168.1.100:554/stream"}]
 
     # 2. Inisialisasi Multithreaded Streams
     streams = []
     for cam in cameras_data:
-        if cam.get('status') == 'active' and cam.get('rtsp_url'):
-            streams.append(CameraStream(cam['name'], cam['rtsp_url']))
+        streams.append(CameraStream(cam['name'], cam['rtsp_url']))
     
     logging.info(f"Berhasil menginisialisasi {len(streams)} kamera.")
 
@@ -248,7 +267,7 @@ def main():
                         bx1, by1, bx2, by2 = map(int, box.xyxy[0])
                         cv2.rectangle(frame, (bx1, by1), (bx2, by2), (0, 0, 255), 3)
                         
-                    send_webhook(stream.name, "Aktifitas", severity_text, msg, active_person_class, frame)
+                    send_firebase_alert(stream.name, "Aktifitas", severity_text, msg, active_person_class, frame)
                     stream.last_trigger_time = current_time
 
         # Sleep kecil agar tidak memakan CPU 100% jika semua kelas kosong

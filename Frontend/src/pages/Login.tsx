@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { LogIn, Mail, Lock, AlertCircle, Shield } from 'lucide-react';
 
 export default function Login() {
-    const [userId, setUserId] = useState('1'); // Default ke 1
-    const [password, setPassword] = useState('password'); // Default ke password
+    const [email, setEmail] = useState('admin@schoolguard.com'); // Default ke admin
+    const [password, setPassword] = useState('password123'); // Minimum 6 chars for Firebase
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [debugInfo, setDebugInfo] = useState('');
@@ -20,8 +20,8 @@ export default function Login() {
         setLoading(true);
 
         try {
-            setDebugInfo(`Mencoba login dengan User ID: ${userId}...`);
-            await login(userId, password);
+            setDebugInfo(`Mencoba login dengan Email: ${email}...`);
+            await login(email, password);
             setDebugInfo('Login berhasil! Redirecting...');
             navigate('/');
         } catch (err: any) {
@@ -33,10 +33,9 @@ export default function Login() {
         }
     };
 
-    // Auto-fill for testing
     useEffect(() => {
-        setUserId('1');
-        setPassword('password');
+        setEmail('admin@schoolguard.com');
+        setPassword('password123');
     }, []);
 
     return (
@@ -85,14 +84,14 @@ export default function Login() {
                         <div className="space-y-2">
                             <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                                 <Mail size={16} className="text-emerald-600" />
-                                ID User
+                                Alamat Email
                             </label>
                             <input
-                                type="text"
-                                value={userId}
-                                onChange={(e) => setUserId(e.target.value)}
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all outline-none text-slate-800 font-medium"
-                                placeholder="Masukkan User ID"
+                                placeholder="admin@schoolguard.com"
                                 required
                             />
                         </div>
@@ -135,25 +134,25 @@ export default function Login() {
 
                     {/* Demo Credentials */}
                     <div className="mt-6 p-4 bg-gradient-to-br from-emerald-50 to-slate-50 rounded-lg border border-emerald-100">
-                        <p className="text-xs font-bold text-emerald-900 mb-3">✨ Demo Credentials (3 Roles):</p>
+                        <p className="text-xs font-bold text-emerald-900 mb-3">✨ Demo Credentials (Auto-Register):</p>
 
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 text-xs">
                                 <span className="px-2 py-1 bg-red-100 text-red-700 rounded font-bold">ADMIN</span>
-                                <span className="font-mono text-slate-700">ID: 1 | password</span>
+                                <span className="font-mono text-slate-700">admin@schoolguard.com</span>
                             </div>
                             <div className="flex items-center gap-2 text-xs">
                                 <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded font-bold">MANAGEMENT</span>
-                                <span className="font-mono text-slate-700">ID: 2 | password</span>
+                                <span className="font-mono text-slate-700">management@schoolguard.com</span>
                             </div>
                             <div className="flex items-center gap-2 text-xs">
                                 <span className="px-2 py-1 bg-green-100 text-green-700 rounded font-bold">STAFF</span>
-                                <span className="font-mono text-slate-700">ID: 3 | password</span>
+                                <span className="font-mono text-slate-700">staff@schoolguard.com</span>
                             </div>
                         </div>
 
                         <p className="text-xs text-green-700 mt-3 border-t border-emerald-200 pt-2">
-                            ✓ Default: Admin (ID=1) sudah terisi
+                            ✓ Password untuk semuanya: <b>password123</b>
                         </p>
                     </div>
                 </div>
