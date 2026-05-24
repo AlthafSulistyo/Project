@@ -1,20 +1,21 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import axios from 'axios';
+import { auth, db } from '../firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-interface User {
-    id: number;
+export interface User {
+    id: string;
     name: string;
     email: string;
-    role: 'admin' | 'management' | 'staff'; // Added role
+    role: 'admin' | 'management' | 'staff';
 }
 
 interface AuthContextType {
     user: User | null;
     token: string | null;
-    login: (userId: string, password: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<void>;
     logout: () => void;
     isAuthenticated: boolean;
-    // Role helper methods
     isAdmin: () => boolean;
     isManagement: () => boolean;
     hasRole: (role: string) => boolean;
@@ -26,64 +27,68 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
 
-    // Load token from localStorage on mount
     useEffect(() => {
-        const storedToken = localStorage.getItem('auth_token');
-        const storedUser = localStorage.getItem('auth_user');
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                // Get token
+                const token = await firebaseUser.getIdToken();
+                setToken(token);
+                
+                // Fetch role from Firestore
+                const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+                if (userDoc.exists()) {
+                    setUser(userDoc.data() as User);
+                } else {
+                    // Fallback default role based on email if doc doesn't exist
+                    let defaultRole: 'admin' | 'management' | 'staff' = 'staff';
+                    if (firebaseUser.email === 'admin@schoolguard.com') defaultRole = 'admin';
+                    else if (firebaseUser.email?.includes('management')) defaultRole = 'management';
+                    
+                    const newUser: User = {
+                        id: firebaseUser.uid,
+                        name: firebaseUser.email?.split('@')[0] || 'User',
+                        email: firebaseUser.email || '',
+                        role: defaultRole
+                    };
+                    setUser(newUser);
+                    // Save to firestore
+                    await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+                }
+            } else {
+                setUser(null);
+                setToken(null);
+            }
+            setLoading(false);
+        });
 
-        if (storedToken && storedUser) {
-            setToken(storedToken);
-            setUser(JSON.parse(storedUser));
-            // Set axios default header
-            axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-        }
+        return () => unsubscribe();
     }, []);
 
-    const login = async (userId: string, password: string) => {
+    const login = async (email: string, password: string) => {
         try {
-            const response = await axios.post(`http://127.0.0.1:8000/api/login`, {
-                user_id: parseInt(userId),
-                password: password,
-            });
-
-            const { token: authToken, user: userData } = response.data;
-
-            setToken(authToken);
-            setUser(userData);
-
-            // Store in localStorage
-            localStorage.setItem('auth_token', authToken);
-            localStorage.setItem('auth_user', JSON.stringify(userData));
-
-            // Set axios default header for future requests
-            axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+            // Try to login
+            await signInWithEmailAndPassword(auth, email, password);
         } catch (error: any) {
-            console.error('Login failed:', error);
-            throw error; // Re-throw to be handled by Login component
+            // If user not found, auto-register for demo purposes
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                console.log("User not found, attempting auto-register for demo...");
+                try {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                } catch (registerError) {
+                    throw registerError;
+                }
+            } else {
+                throw error;
+            }
         }
     };
 
-    const logout = () => {
-        // Call logout API
-        if (token) {
-            axios.post(`http://127.0.0.1:8000/api/logout`)
-                .catch(err => console.error('Logout API call failed:', err));
-        }
-
-        // Clear state
-        setToken(null);
-        setUser(null);
-
-        // Clear localStorage
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-
-        // Remove axios header
-        delete axios.defaults.headers.common['Authorization'];
+    const logout = async () => {
+        await firebaseSignOut(auth);
     };
 
-    // Role helper methods
     const isAdmin = () => user?.role === 'admin';
     const isManagement = () => user?.role === 'management';
     const hasRole = (role: string) => user?.role === role;
@@ -94,12 +99,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         token,
         login,
         logout,
-        isAuthenticated: !!token && !!user,
+        isAuthenticated: !!user,
         isAdmin,
         isManagement,
         hasRole,
         hasAnyRole,
     };
+
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">Memuat Autentikasi...</div>;
+    }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

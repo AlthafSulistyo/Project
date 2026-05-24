@@ -1,22 +1,26 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { useLocation } from 'react-router-dom';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { FileText, Download, Calendar, Filter, Search, Printer, Eye, Video } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 // Interface Data
 interface CctvEvent {
-    id: number;
+    id: string;
     camera_name: string;
     event_type: string;
-    severity: 'high' | 'medium' | 'low';
+    severity: string;
     is_reviewed: boolean;
     created_at: string;
-    snapshot_path?: string;
+    snapshot_url?: string;
 }
 
 export default function Laporan() {
-    const { hasAnyRole } = useAuth(); // Add role checking
+    const { hasAnyRole } = useAuth();
     const location = useLocation();
     const [logs, setLogs] = useState<CctvEvent[]>([]);
     const [loading, setLoading] = useState(true);
@@ -25,176 +29,137 @@ export default function Laporan() {
     const [endDate, setEndDate] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 34; // 100 data / 3 halaman ≈ 34 per halaman
+    const itemsPerPage = 34;
 
     // Modal state
     const [showModal, setShowModal] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<CctvEvent | null>(null);
 
-    // Fetch logs from API
-    const fetchLogs = async (silent = false) => {
-        try {
-            if (!silent) setLoading(true);
-            const response = await axios.get(`http://127.0.0.1:8000/api/cctv-events`);
+    // Fetch logs from Firebase Firestore
+    useEffect(() => {
+        setLoading(true);
+        const q = query(collection(db, 'cctv_events'), orderBy('timestamp', 'desc'));
 
-            // Laravel Resource Collection returns: response.data.data (pagination wrapper)
-            const rawData = response.data.data;
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const eventsData: CctvEvent[] = [];
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                eventsData.push({
+                    id: doc.id,
+                    camera_name: data.camera_name || 'Unknown',
+                    event_type: data.category || data.event_type || 'Aktivitas',
+                    severity: data.severity?.toLowerCase() || 'low',
+                    is_reviewed: data.status === 'reviewed' || data.is_reviewed || false,
+                    created_at: data.timestamp?.toDate()?.toISOString() || new Date().toISOString(),
+                    snapshot_url: data.snapshot_url
+                });
+            });
 
-            setLogs(rawData);
-            if (!silent) setLoading(false);
+            setLogs(eventsData);
+            setLoading(false);
 
+            // Handle location state for opening modal automatically
             if (location.state?.selectedEventId) {
-                const targetEvent = rawData.find((e: CctvEvent) => e.id === location.state.selectedEventId);
+                const targetEvent = eventsData.find((e) => e.id === location.state.selectedEventId);
                 if (targetEvent) {
                     setSelectedEvent(targetEvent);
                     setShowModal(true);
                 }
-                // Hapus state dari history agar tidak auto-open kalau user refresh halaman
+                // Hapus state dari history
                 window.history.replaceState({}, document.title);
             }
-        } catch (error) {
-            console.error('Error fetching logs:', error);
-            if (!silent) setLoading(false);
-        }
-    };
+        }, (error) => {
+            console.error('Error fetching logs from Firebase:', error);
+            setLoading(false);
+        });
 
-    // Mark event as reviewed
-    const handleMarkReviewed = async (eventId: number) => {
-        const token = localStorage.getItem('auth_token');
+        return () => unsubscribe();
+    }, [location.state?.selectedEventId]);
 
+    // Mark event as reviewed in Firestore
+    const handleMarkReviewed = async (eventId: string) => {
         try {
-            const response = await axios.patch(
-                `http://127.0.0.1:8000/api/cctv-events/${eventId}/review`,
-                { is_reviewed: true },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                    }
-                }
-            );
+            const eventRef = doc(db, 'cctv_events', eventId);
+            await updateDoc(eventRef, {
+                status: 'reviewed',
+                is_reviewed: true
+            });
 
-            if (response.status === 200) {
-                // Update local state
-                setLogs(prevLogs =>
-                    prevLogs.map(log =>
-                        log.id === eventId ? { ...log, is_reviewed: true } : log
-                    )
-                );
-
-                // Update selected event if still open
-                if (selectedEvent && selectedEvent.id === eventId) {
-                    setSelectedEvent({ ...selectedEvent, is_reviewed: true });
-                }
-
-                // Show success message
-                alert('✅ Event berhasil ditandai sebagai "Reviewed"');
-
-                // Close modal
-                setShowModal(false);
+            // Update selected event locally so the modal reflects the change immediately
+            if (selectedEvent && selectedEvent.id === eventId) {
+                setSelectedEvent({ ...selectedEvent, is_reviewed: true });
             }
+
+            alert('✅ Event berhasil ditandai sebagai "Reviewed"');
+            setShowModal(false);
         } catch (error) {
             console.error('Error marking as reviewed:', error);
-            alert('❌ Gagal menandai event. Silakan coba lagi.');
+            alert('❌ Gagal menandai event di Firebase. Silakan coba lagi.');
         }
     };
-
-    useEffect(() => {
-        fetchLogs(); // Fetch pertama kali saat render
-
-        // Auto-refresh setiap 5 detik secara silent (tanpa animasi loading)
-        const intervalId = setInterval(() => {
-            fetchLogs(true);
-        }, 5000);
-
-        // Bersihkan interval ketika komponen di-unmount
-        return () => clearInterval(intervalId);
-    }, []);
 
     // Export to PDF
     const handleExportPDF = () => {
-        const token = localStorage.getItem('auth_token');
+        try {
+            const doc = new jsPDF();
+            doc.text("Laporan Aktivitas CCTV - SchoolGuard", 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 22);
+            
+            const tableData = filteredLogs.map((log) => [
+                new Date(log.created_at).toLocaleString('id-ID'),
+                log.camera_name,
+                log.event_type.toUpperCase(),
+                log.severity.toUpperCase(),
+                log.is_reviewed ? 'Reviewed' : 'New'
+            ]);
 
-        // Use default dates if not set (last 7 days)
-        const endDateValue = endDate || new Date().toISOString().split('T')[0];
-        const startDateValue = startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-        const params = new URLSearchParams({
-            start_date: startDateValue,
-            end_date: endDateValue,
-        });
-
-        const url = `http://127.0.0.1:8000/api/export/pdf?${params.toString()}`;
-
-        fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/pdf',
-            },
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.blob();
-            })
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Laporan_CCTV_${startDateValue}_to_${endDateValue}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-            })
-            .catch(error => {
-                console.error('Export PDF error:', error);
-                alert('Gagal export PDF. Pastikan Anda sudah login sebagai Admin atau Management.');
+            autoTable(doc, {
+                head: [['Waktu Kejadian', 'Kamera', 'Objek Terdeteksi', 'Risiko', 'Status']],
+                body: tableData,
+                startY: 25,
+                theme: 'grid',
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [16, 185, 129] } // Emerald-500
             });
+            
+            doc.save("Laporan_CCTV_SchoolGuard.pdf");
+        } catch (error) {
+            console.error("Gagal export PDF:", error);
+            alert("Terjadi kesalahan saat mengekspor ke PDF.");
+        }
     };
 
     // Export to Excel
     const handleExportExcel = () => {
-        const token = localStorage.getItem('auth_token');
-
-        // Use default dates if not set (last 7 days)
-        const endDateValue = endDate || new Date().toISOString().split('T')[0];
-        const startDateValue = startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-        const params = new URLSearchParams({
-            start_date: startDateValue,
-            end_date: endDateValue,
-        });
-
-        const url = `http://127.0.0.1:8000/api/export/excel?${params.toString()}`;
-
-        fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'text/csv',
-            },
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.blob();
-            })
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Laporan_CCTV_${startDateValue}_to_${endDateValue}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-            })
-            .catch(error => {
-                console.error('Export Excel error:', error);
-                alert('Gagal export Excel. Pastikan Anda sudah login sebagai Admin atau Management.');
-            });
+        try {
+            const dataToExport = filteredLogs.map(log => ({
+                "Waktu Kejadian": new Date(log.created_at).toLocaleString('id-ID'),
+                "Sumber Kamera": log.camera_name,
+                "Objek Terdeteksi": log.event_type.toUpperCase(),
+                "Tingkat Risiko": log.severity.toUpperCase(),
+                "Status": log.is_reviewed ? 'Sudah Direview' : 'Belum Direview'
+            }));
+            
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Data Kejadian");
+            
+            // Adjust column widths
+            const wscols = [
+                {wch: 25}, // Waktu
+                {wch: 20}, // Kamera
+                {wch: 20}, // Objek
+                {wch: 15}, // Risiko
+                {wch: 15}  // Status
+            ];
+            worksheet['!cols'] = wscols;
+            
+            XLSX.writeFile(workbook, "Laporan_CCTV_SchoolGuard.xlsx");
+        } catch (error) {
+            console.error("Gagal export Excel:", error);
+            alert("Terjadi kesalahan saat mengekspor ke Excel.");
+        }
     };
 
     // Filter Data
@@ -297,7 +262,6 @@ export default function Laporan() {
                     </div>
                     <div className="relative flex-1 md:w-64">
                         <Search size={16} className="absolute left-3 top-3 text-slate-400" />
-                        {/* Search difokuskan ke tipe kejadian karena kamera cuma satu */}
                         <input
                             type="text"
                             placeholder="Cari jenis deteksi..."
@@ -313,7 +277,7 @@ export default function Laporan() {
             <div className="bg-[#0f172a] rounded-xl shadow-lg border border-slate-800/50 ring-1 ring-white/5 overflow-hidden min-h-[400px]">
                 {loading ? (
                     <div className="p-10 text-center text-slate-500 animate-pulse">
-                        <p>Mengunduh data log...</p>
+                        <p>Mengunduh data log dari Firebase...</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -388,7 +352,7 @@ export default function Laporan() {
                                         <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                                             <div className="flex flex-col items-center gap-2">
                                                 <Search size={32} className="opacity-20" />
-                                                <p>Tidak ada data kejadian ditemukan untuk filter ini.</p>
+                                                <p>Tidak ada data kejadian ditemukan dari Firebase.</p>
                                             </div>
                                         </td>
                                     </tr>
@@ -401,7 +365,7 @@ export default function Laporan() {
                 {/* Pagination */}
                 <div className="p-4 border-t border-slate-800/50 flex justify-between items-center bg-[#1e293b]/30">
                     <span className="text-xs text-slate-500">
-                        Menampilkan {filteredLogs.length === 0 ? 0 : indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredLogs.length)} dari {filteredLogs.length} entri mencurigakan (Halaman {currentPage} dari {totalPages || 1})
+                        Menampilkan {filteredLogs.length === 0 ? 0 : indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredLogs.length)} dari {filteredLogs.length} entri (Halaman {currentPage} dari {totalPages || 1})
                     </span>
                     <div className="flex gap-2">
                         <button 
@@ -487,9 +451,9 @@ export default function Laporan() {
 
                             {/* Snapshot Preview */}
                             <div className="bg-slate-950 rounded-lg p-4 border border-slate-800 ring-1 ring-white/5">
-                                {selectedEvent.snapshot_path ? (
+                                {selectedEvent.snapshot_url ? (
                                     <img 
-                                        src={`http://127.0.0.1:8000/${selectedEvent.snapshot_path}`} 
+                                        src={selectedEvent.snapshot_url} 
                                         alt="CCTV Snapshot" 
                                         className="w-full h-auto rounded-md object-contain max-h-[400px] border border-slate-800/80" 
                                     />
@@ -498,7 +462,6 @@ export default function Laporan() {
                                         <div className="text-6xl mb-4 opacity-50">📷</div>
                                         <p className="font-semibold text-slate-400">Snapshot Tidak Tersedia</p>
                                         <p className="text-sm mt-2">Kamera tidak menangkap snapshot untuk event ini</p>
-                                        <p className="text-xs mt-1 text-slate-600">(A past event or non-camera manual trigger)</p>
                                     </div>
                                 )}
                             </div>

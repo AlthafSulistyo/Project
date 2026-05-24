@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { collection, query, orderBy, onSnapshot, where, limit } from 'firebase/firestore';
+import { db } from '../firebase';
 import { LineChart, Line, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AlertTriangle, Video, Activity, Clock, MapPin, CheckCircle } from 'lucide-react';
 
@@ -14,122 +15,142 @@ interface DashboardStats {
 }
 
 interface CctvEvent {
-  id: number;
+  id: string;
   camera_name: string;
   event_type: string;
-  severity: 'high' | 'medium' | 'low';
+  severity: string;
   is_reviewed: boolean;
   created_at: string;
 }
 
 interface Camera {
-  id: number;
+  id: string;
   name: string;
   location: string;
   status: string;
 }
 
-// Data dummy grafik (bisa diganti API jika nanti ada)
-const dataGrafik = [
-  { jam: '08:00', event: 12 }, { jam: '10:00', event: 45 },
-  { jam: '12:00', event: 80 }, { jam: '14:00', event: 50 },
-  { jam: '16:00', event: 20 }, { jam: '18:00', event: 65 },
-  { jam: '20:00', event: 30 },
+// Data dummy grafik mingguan
+const dummyWeeklyTrend = [
+  { day: 'Sen', low: 5, medium: 2, high: 0 },
+  { day: 'Sel', low: 8, medium: 3, high: 1 },
+  { day: 'Rab', low: 4, medium: 1, high: 0 },
+  { day: 'Kam', low: 6, medium: 4, high: 2 },
+  { day: 'Jum', low: 10, medium: 5, high: 1 },
+  { day: 'Sab', low: 2, medium: 0, high: 0 },
+  { day: 'Min', low: 1, medium: 0, high: 0 },
 ];
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats>({ total_today: 0, critical_alerts: 0, active_cameras: 0 });
+  const [stats, setStats] = useState<DashboardStats>({ 
+    total_today: 0, 
+    critical_alerts: 0, 
+    active_cameras: 0,
+    weekly_trend: dummyWeeklyTrend,
+    monthly_recap: { current_month_total: 0, percentage_change: 0, by_severity: { high: 0, medium: 0, low: 0 } }
+  });
   const [events, setEvents] = useState<CctvEvent[]>([]);
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Ref untuk menyimpan ID notifikasi terakhir agar tidak spam bunyi terus
-  const lastNotifiedId = useRef<number | null>(null);
-
-  const fetchData = async () => {
-    try {
-      // Kita panggil 3 API sekaligus: Statistik, Daftar Kejadian, dan Kamera
-      const [resStats, resEvents, resCameras] = await Promise.all([
-        axios.get(`http://127.0.0.1:8000/api/cctv-stats`),
-        axios.get(`http://127.0.0.1:8000/api/cctv-events`),
-        axios.get(`http://127.0.0.1:8000/api/cameras`)
-      ]);
-
-      // 1. Update Statistik
-      const statData = resStats.data.summary;
-      const highAlerts = statData.by_severity.find((s: any) => s.severity === 'high')?.total || 0;
-      setStats({
-        total_today: statData.total_today,
-        critical_alerts: highAlerts,
-        active_cameras: statData.active_cameras || 0,
-        weekly_trend: statData.weekly_trend || [],
-        monthly_recap: statData.monthly_recap || {}
-      });
-
-      // 2. Update Tabel (Ambil 5 data terbaru saja)
-      const eventsData = resEvents.data.data;
-      setEvents(eventsData.slice(0, 5));
-
-      // 3. Update Kamera
-      setCameras(resCameras.data.data || []);
-
-      // --- LOGIKA NOTIFIKASI BARU (POP-UP) ---
-      const latestEvent = eventsData[0];
-
-      // Cek apakah ada data, severity HIGH, belum direview, DAN belum dinotifikasi sebelumnya
-      if (latestEvent && latestEvent.severity === 'high' && !latestEvent.is_reviewed) {
-
-        // Cek ID agar tidak notif berulang untuk kejadian yang sama
-        if (lastNotifiedId.current !== latestEvent.id) {
-
-          // Memunculkan notifikasi browser
-          if (!("Notification" in window)) {
-            console.log("Browser tidak mendukung notifikasi");
-          } else if (Notification.permission === "granted") {
-            new Notification("⚠️ BAHAYA TERDETEKSI!", {
-              body: `Terdeteksi ${latestEvent.event_type} di ${latestEvent.camera_name}`,
-              icon: "/vite.svg", // Pastikan file icon ada, atau bisa dihapus baris ini
-              requireInteraction: true // Notifikasi tidak hilang otomatis sampai diklik
-            });
-
-            // Simpan ID agar tidak bunyi lagi
-            lastNotifiedId.current = latestEvent.id;
-
-          } else if (Notification.permission !== "denied") {
-            Notification.requestPermission();
-          }
-        }
-      }
-
-      setLoading(false);
-    } catch (error) {
-      console.error("Gagal koneksi ke Backend:", error);
-      setLoading(false);
-    }
-  };
+  // Ref untuk menyimpan ID notifikasi terakhir agar tidak spam
+  const lastNotifiedId = useRef<string | null>(null);
 
   useEffect(() => {
-    // Minta izin notifikasi saat pertama kali buka dashboard
-    if ("Notification" in window && Notification.permission !== "granted") {
-      Notification.requestPermission();
-    }
 
-    fetchData();
-    const interval = setInterval(fetchData, 5000); // Update setiap 5 detik
-    return () => clearInterval(interval);
+    // --- 1A. FIREBASE LISTENER UNTUK STATISTIK HARI INI ---
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const qStats = query(
+      collection(db, 'cctv_events'),
+      where('timestamp', '>=', today)
+    );
+
+    const unsubscribeStats = onSnapshot(qStats, (snapshot) => {
+      let total = 0;
+      let critical = 0;
+
+      snapshot.forEach((doc) => {
+        total++;
+        const data = doc.data();
+        const severityStr = data.severity?.toLowerCase() || 'low';
+        if (severityStr === 'high') critical++;
+      });
+
+      setStats(prev => ({
+        ...prev,
+        total_today: total,
+        critical_alerts: critical,
+        monthly_recap: {
+            ...prev.monthly_recap,
+            current_month_total: total, 
+            by_severity: { high: critical, medium: 0, low: total - critical }
+        }
+      }));
+    });
+
+    // --- 1B. FIREBASE LISTENER UNTUK 5 EVENT TERBARU (BEBAS TANGGAL) ---
+    const qLatestEvents = query(
+      collection(db, 'cctv_events'),
+      orderBy('timestamp', 'desc'),
+      limit(5)
+    );
+
+    const unsubscribeEvents = onSnapshot(qLatestEvents, (snapshot) => {
+      const latestEvents: CctvEvent[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        latestEvents.push({
+          id: doc.id,
+          camera_name: data.camera_name || 'Unknown',
+          event_type: data.category || data.event_type || 'Aktivitas',
+          severity: data.severity?.toLowerCase() || 'low',
+          is_reviewed: data.status === 'reviewed' || data.is_reviewed || false,
+          created_at: data.timestamp?.toDate()?.toISOString() || new Date().toISOString()
+        });
+      });
+
+      setEvents(latestEvents);
+      setLoading(false);
+    }, (error) => {
+      console.error("Firebase Events Listener Error:", error);
+      setLoading(false);
+    });
+
+    // --- 2. FIREBASE REAL-TIME LISTENER UNTUK KAMERA ---
+    const qCameras = query(collection(db, 'cameras'));
+    const unsubscribeCameras = onSnapshot(qCameras, (snapshot) => {
+      let activeCount = 0;
+      const cams: Camera[] = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        cams.push({ id: doc.id, ...data } as Camera);
+        if (data.status === 'active') activeCount++;
+      });
+      setStats(prev => ({ ...prev, active_cameras: activeCount }));
+      setCameras(cams);
+    }, (error) => {
+      console.error("Firebase Cameras Listener Error:", error);
+    });
+
+    return () => {
+      unsubscribeStats();
+      unsubscribeEvents();
+      unsubscribeCameras();
+    };
   }, []);
 
   if (loading) return <div className="p-8 text-slate-400">Memuat Data Sistem...</div>;
 
   return (
     <div className="space-y-6 p-6">
-
       {/* Header Halaman */}
       <div className="flex justify-between items-center mb-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-100 tracking-tight">Dashboard Monitoring</h1>
-          <p className="text-slate-400 text-sm">Real-time update from CCTV Server</p>
+          <p className="text-slate-400 text-sm">Real-time update from Firebase Firestore</p>
         </div>
         <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-bold animate-pulse flex items-center gap-2 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
           <span className="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_5px_rgba(16,185,129,0.8)]"></span> System Online
@@ -151,7 +172,7 @@ const Dashboard = () => {
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
           <div className="relative z-10">
             <p className="text-slate-400 text-sm font-medium">Kamera Terhubung</p>
-            <h3 className="text-4xl font-bold text-slate-100 mt-1">{stats.active_cameras}/{cameras.length}</h3>
+            <h3 className="text-4xl font-bold text-slate-100 mt-1">{stats.active_cameras}</h3>
           </div>
           <div className="p-3 bg-[#1e293b] text-emerald-400 rounded-lg border border-slate-700/50 shadow-inner relative z-10"><Video size={24} /></div>
         </div>
@@ -167,7 +188,7 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 2. WEEKLY TREND (Kiri 2/3) */}
+        {/* 2. WEEKLY TREND */}
         <div className="lg:col-span-2 bg-[#0f172a] p-6 rounded-xl shadow-lg border border-slate-800/50 ring-1 ring-white/5">
             <h3 className="font-bold text-slate-100 mb-6 text-lg tracking-tight">Tren Aktivitas Sepekan</h3>
             <div className="h-[320px]">
@@ -179,21 +200,19 @@ const Dashboard = () => {
                         <Tooltip 
                             cursor={{ stroke: '#334155', strokeWidth: 1, strokeDasharray: '4 4' }}
                             contentStyle={{ backgroundColor: '#1e293b', borderRadius: '12px', border: '1px solid #334155', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)', color: '#f1f5f9' }} 
-                            itemStyle={{ color: '#e2e8f0', fontWeight: 'bold' }}
                         />
                         <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                        <Line type="monotone" dataKey="low" name="Rendah (Low)" stroke="#10b981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#0f172a' }} activeDot={{ r: 6, strokeWidth: 0, fill: '#10b981' }} />
-                        <Line type="monotone" dataKey="medium" name="Sedang (Mid)" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#0f172a' }} activeDot={{ r: 6, strokeWidth: 0, fill: '#f59e0b' }} />
-                        <Line type="monotone" dataKey="high" name="Bahaya (High)" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#0f172a' }} activeDot={{ r: 6, strokeWidth: 0, fill: '#f43f5e' }} />
+                        <Line type="monotone" dataKey="low" name="Rendah (Low)" stroke="#10b981" strokeWidth={3} dot={false} />
+                        <Line type="monotone" dataKey="medium" name="Sedang (Mid)" stroke="#f59e0b" strokeWidth={3} dot={false} />
+                        <Line type="monotone" dataKey="high" name="Bahaya (High)" stroke="#f43f5e" strokeWidth={3} dot={false} />
                     </LineChart>
                 </ResponsiveContainer>
             </div>
         </div>
 
-        {/* 3. MONTHLY RECAP (Kanan 1/3) */}
+        {/* 3. MONTHLY RECAP */}
         <div className="bg-[#0f172a] p-6 rounded-xl shadow-lg border border-slate-800/50 ring-1 ring-white/5 flex flex-col">
           <h3 className="font-bold text-slate-100 mb-2 text-lg tracking-tight">Rekap Bulan Ini</h3>
-          
           <div className="flex-1 flex flex-col justify-center items-center text-center mt-4 mb-4">
               <div className="w-32 h-32 rounded-full border-[6px] border-slate-800 flex items-center justify-center mb-4 relative drop-shadow-sm">
                   <div className="absolute inset-0 rounded-full border-[6px] border-emerald-500 border-t-transparent border-l-transparent rotate-45"></div>
@@ -202,27 +221,19 @@ const Dashboard = () => {
                       <span className="text-xs text-slate-400 font-bold tracking-wider">EVENT</span>
                   </div>
               </div>
-              
-              <div className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm border ${
-                  (stats.monthly_recap?.percentage_change || 0) > 0 
-                  ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' 
-                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                }`}>
-                  {(stats.monthly_recap?.percentage_change || 0) > 0 ? '↗ Naik' : '↘ Turun'} {Math.abs(stats.monthly_recap?.percentage_change || 0)}% dari bulan lalu
-              </div>
           </div>
           
           <div className="space-y-3 mt-auto border-t border-slate-800/50 pt-4">
               <div className="flex justify-between items-center text-sm p-2 rounded-lg hover:bg-[#1e293b] transition">
-                  <span className="flex items-center gap-2 text-slate-300 font-medium"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></span> Bahaya (High)</span>
+                  <span className="flex items-center gap-2 text-slate-300 font-medium"><span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Bahaya (High)</span>
                   <span className="font-bold text-slate-100 bg-[#1e293b] border border-slate-700 px-3 py-0.5 rounded-md">{stats.monthly_recap?.by_severity?.high || 0}</span>
               </div>
               <div className="flex justify-between items-center text-sm p-2 rounded-lg hover:bg-[#1e293b] transition">
-                  <span className="flex items-center gap-2 text-slate-300 font-medium"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></span> Menengah (Mid)</span>
+                  <span className="flex items-center gap-2 text-slate-300 font-medium"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Menengah (Mid)</span>
                   <span className="font-bold text-slate-100 bg-[#1e293b] border border-slate-700 px-3 py-0.5 rounded-md">{stats.monthly_recap?.by_severity?.medium || 0}</span>
               </div>
               <div className="flex justify-between items-center text-sm p-2 rounded-lg hover:bg-[#1e293b] transition">
-                  <span className="flex items-center gap-2 text-slate-300 font-medium"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span> Rendah (Low)</span>
+                  <span className="flex items-center gap-2 text-slate-300 font-medium"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Rendah (Low)</span>
                   <span className="font-bold text-slate-100 bg-[#1e293b] border border-slate-700 px-3 py-0.5 rounded-md">{stats.monthly_recap?.by_severity?.low || 0}</span>
               </div>
           </div>
